@@ -14,6 +14,7 @@ import os;
 from reportlab.platypus import tables
 import types
 import sys;
+import sqlite3;
 
 
 
@@ -150,6 +151,17 @@ def	assignHouseholds(t):
 	#indices = [];
 	allindvs = []
 	cc = 0;
+	
+	agebracket=[20,21,22,25,30,35,40,45,50,55,60,62,65,67,70,75,80,85,100];
+	frange = [32,49+1]
+	mrange = [8,25+1]
+	childages = [0,19]
+	fcrange = [24,43+1]
+	mcrange = [3,22+1]
+	
+	cpop = 0;
+	hpop = 0;
+	
 	for i in range(len(t["G001"].index)):
 		
 		index = t['G001'].iloc[i].name
@@ -163,15 +175,11 @@ def	assignHouseholds(t):
 # 		print(index)
 		#assign individuals
 		pop = t['P12'].at[index,'D001'];
+
 		#print(pop)
 		
 		
-		agebracket=[20,21,22,25,30,35,40,45,50,55,60,62,65,67,70,75,80,85,100];
-		frange = [32,49+1]
-		mrange = [8,25+1]
-		childages = [0,19]
-		fcrange = [24,43+1]
-		mcrange = [3,22+1]
+
 		
 		indvs = [];
 		
@@ -523,7 +531,7 @@ def	assignHouseholds(t):
 				if(len(hhcand) < 1): hhcand = [ind for ind,x in enumerate(indvs) if x.age.intersection(range(15,18)) and (x.gen in sg)];
 
 				s = np.random.randint(0,len(hhcand));
-				spselect = hhcand[s]
+				spselect = hhcand[s]#
 				indvs[spselect].household = h;
 				households[h].size += 1;
 		
@@ -629,17 +637,22 @@ def	assignHouseholds(t):
 				select = np.random.randint(0,len(ages));
 				indvs[i].age = ages[select];
 			
-# 			indvs[i].g1 += addin;
-# 			indvs[i].g2 += addin;
+			indvs[i].id = i + cpop;
+			indvs[i].household += hpop;
+			indvs[i].g1 += cpop;
+			indvs[i].g2 += cpop;
 				
 # 		#print([ (x.age,x.household,x.householder) for x in indvs ])
 # 		if(index == 490351008003005):
 # 			print(indvs)
 # 		print(households)
 		
+		cpop += pop;
+		hpop += len(households);
+		
 		allindvs += [indvs];
 # 		cc+=1;
-# 		if(cc > 10000):
+# 		if(cc > 100):
 # 			break;
 # 		else:
 # 			print("breark")
@@ -705,8 +718,49 @@ def plotIndvs(indvs):
 	F.set_size_inches(200,200)
 	F.set_dpi(100);
 	F.savefig("indvmap.png");
+
+
+#converts the STUPID NAMESPACE FORMAT 
+#into a useable DataFrame
+def saveData(indvs):
 	
+	#get size;
+
+	print('gen data frame')
+	allindvs = pd.DataFrame([y for x in indvs for y in x]);
+	#print(allindvs);
+	allindvs.columns = ['raw']
+
+
+	print('transform dataframe')
+	g = lambda x: 1 if(x=='f') else 0;
+	tf = lambda x: 1 if(x==True) else 0;
+
+	expr = [ 
+		('age', lambda b:b.age ),
+		('g1', lambda b:b.g1 ),
+		('g2', lambda b:b.g2 ),
+		('gender', lambda b:g(b.gen) ),
+		('household', lambda b:b.household ),
+		('householder', lambda b:b.householder ),
+		('group', lambda b:tf(b.group) ),
+		('mobile', lambda b:tf(b.mobile) ),
+		('block', lambda b:b.block ),
+		('addrx', lambda b:b.address[0].x ),
+		('addry', lambda b:b.address[0].y ),
+		('addrn', lambda b:b.address[1] ),
+		('city', lambda b:b.address[2] ),
+		('id', lambda b:b.id ),
+	]
+	#cpop = 0;
+	for i in expr:
+		allindvs[i[0]] = allindvs['raw'].apply(i[1]);
 	
+	allindvs = allindvs.drop('raw',axis=1);
+	allindvs.set_index('id')
+			
+	return allindvs;
+		
 
 def main():
 	
@@ -714,6 +768,8 @@ def main():
 	tables = loadCensusTables()
 	print("Assigning household structure...");
 	indvs = assignHouseholds(tables)
+	
+	#saveData(indvs);
 	
 	os.environ['GDAL_DATA']='/uufs/chpc.utah.edu/common/home/u0403692/anaconda/share/gdal/'
 	print("Loading address points...")
@@ -727,12 +783,16 @@ def main():
 	addresses = assignPoints(pts,idx,addr,loc);
 	#exit()
 	print("Assigning home addresses to indviduals...");
-	indvs2 = assignAddresses(indvs,addresses);
+	indvs = assignAddresses(indvs,addresses);
+	print("Prepping for write...")
+	indvs = saveData(indvs);
 	print("Writing to file...")
-	out = pd.DataFrame(indvs2)
-	out.to_pickle("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/assigned.pickle")
-	print("Plotting locations...")
-	plotIndvs(indvs2)
+	con = sqlite3.connect("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/indvs.sq3");
+	indvs.to_sql('indvs',con);
+	con.close();
+	#out.to_pickle("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/assigned.pickle")
+	#print("Plotting locations...")
+	#plotIndvs(indvs2)
 		
 	
 if __name__ == "__main__":

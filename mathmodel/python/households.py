@@ -28,6 +28,8 @@ def getBlockPolys(filename):
 	p=rtree.index.Property(variant=rtree.index.RT_Star)
 	idx = rtree.index.Rtree(properties=p)
 	
+	alts = {}
+	
 	ds = ogr.Open(filename);	
 	#this is probably a hack of sort
 	layer=ds.GetLayer(0);
@@ -45,8 +47,9 @@ def getBlockPolys(filename):
 		id = feat.GetFieldAsInteger64("BLOCKID10");
 
 		idx.insert(id,item.bounds,obj=item);
+		alts[id] = item.centroid
 		
-	return idx;
+	return idx,alts;
 		
 
 def getPointsUT(filename):
@@ -666,7 +669,7 @@ def	assignHouseholds(t):
 #FIXME: I probably need to assign grou phousing differently
 #(it doesn't make much sense to have 300 inmates in a standard house
 #on the other hand, do prisons have their own census block?
-def assignAddresses(indvs, addresses):
+def assignAddresses(indvs, addresses,alts):
 	
 	for i in range(len(indvs)):
 # 		print(indvs[i])
@@ -682,6 +685,14 @@ def assignAddresses(indvs, addresses):
 					np.random.shuffle(blockaddr);
 					for j in range(len(indvs[i])):
 						indvs[i][j].address = addresses[index][blockaddr[housemap[j] % maxblock]];
+			else: 
+				print("BAD:",index, end=' ')
+				badaddr =[alts[index], 'BAD','BAD']
+				for j in range(len(indvs[i])):
+					indvs[i][j].address = badaddr;
+				
+				
+				
 			
 			
 # 			print(blockaddr)
@@ -776,14 +787,14 @@ def main():
 	pts,addr,loc = getPointsUT("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/AddressPoints/AddressPoints.shp")
 	#pts,addr,loc = getPointsUT("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/small/small_points.shp")
 	print("Loading census blocks...")
-	idx = getBlockPolys("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/tabblock2010_49_pophu/tabblock2010_49_pophu.shp")
+	idx,alts = getBlockPolys("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/tabblock2010_49_pophu/tabblock2010_49_pophu.shp")
 	#idx = getBlockPolys("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/small/small_shapes.shp")
 	#	print(pts,addr,loc);
 	print("Assigning points...")
 	addresses = assignPoints(pts,idx,addr,loc);
 	#exit()
 	print("Assigning home addresses to indviduals...");
-	indvs = assignAddresses(indvs,addresses);
+	indvs = assignAddresses(indvs,addresses,alts);
 	print("Prepping for write...")
 	indvs = saveData(indvs);
 	print("Writing to file...")

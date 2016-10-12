@@ -771,14 +771,26 @@ def saveData(indvs):
 	allindvs.set_index('id')
 			
 	return allindvs;
-		
+
+def convaddr(addrs):
+	
+	df = pd.DataFrame([tuple((key,)+tuple(y)) for key,item in addrs.items() for y in addrs[key] ])
+	
+	df.columns = ['block','rawpoint','addrn','city']
+	
+	df['addrx'] = df['rawpoint'].apply(lambda b:b.x)
+	df['addry'] = df['rawpoint'].apply(lambda b:b.y)
+	df = df.drop('rawpoint',axis=1)
+	
+	return df;
+	  
 
 def main():
 	
 	print("Loading census tables...")
-	tables = loadCensusTables()
+	#tables = loadCensusTables()
 	print("Assigning household structure...");
-	indvs = assignHouseholds(tables)
+	#indvs = assignHouseholds(tables)
 	
 	#saveData(indvs);
 	
@@ -788,11 +800,21 @@ def main():
 	#pts,addr,loc = getPointsUT("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/small/small_points.shp")
 	print("Loading census blocks...")
 	idx,alts = getBlockPolys("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/tabblock2010_49_pophu/tabblock2010_49_pophu.shp")
-	#idx = getBlockPolys("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/small/small_shapes.shp")
+	#idx,alts = getBlockPolys("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/small/small_shapes.shp")
 	#	print(pts,addr,loc);
 	print("Assigning points...")
 	addresses = assignPoints(pts,idx,addr,loc);
-	#exit()
+	
+	outaddr = convaddr(addresses);
+	con = sqlite3.connect("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/blockaddr.sq3");
+	outaddr.to_sql('blockaddr',con);
+	con.close();
+
+	
+	
+	
+	
+	exit()
 	print("Assigning home addresses to indviduals...");
 	indvs = assignAddresses(indvs,addresses,alts);
 	print("Prepping for write...")

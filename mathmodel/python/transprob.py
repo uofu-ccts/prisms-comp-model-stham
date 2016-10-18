@@ -3,6 +3,7 @@ import time;
 import sqlite3;
 import numpy as np;
 
+
 datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/timeuse/"
 
 print("reading...")

@@ -810,11 +810,6 @@ def main():
 	outaddr.to_sql('blockaddr',con);
 	con.close();
 
-	
-	
-	
-	
-	exit()
 	print("Assigning home addresses to indviduals...");
 	indvs = assignAddresses(indvs,addresses,alts);
 	print("Prepping for write...")

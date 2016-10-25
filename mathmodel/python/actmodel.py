@@ -7,6 +7,8 @@ import datetime
 import multiprocessing as mp;
 import matplotlib.pyplot as plt;
 import h5py;
+import mkl;
+import sys;
 
 
 
@@ -61,7 +63,7 @@ def adult(frame, tpgroup, weibull, day):
 			#determine maximum range based on travel time
 			#we assume an average speed of 60 kph using taxicab movement
 			#60 kph is 1000 m/min
-			dist = np.floor(1000.0 * t)
+			dist = np.floor(800.0 * t)
 
 			
 			#if we are working and we are NOT at work, go to work
@@ -87,8 +89,8 @@ def adult(frame, tpgroup, weibull, day):
 				elif t > 960 and (np.random.rand() > 0.25):
 					locx = frame['addrx']; locy = frame['addry']
 				else:
-					locx = np.random.randint(-dist, dist) + locx;
-					locy = np.random.randint(-dist, dist) + locy;
+					locx = np.random.randint(-dist, dist) + frame['addrx'];
+					locy = np.random.randint(-dist, dist) + frame['addry'];
 			
 			g = tpgroup.get_group((day,hour));
 			#act = np.random.choice(g['dest'],p=(g['count']/np.sum(g['count'])));
@@ -191,8 +193,8 @@ def indchild(frame, tpgroup, weibull,day):
 					elif t > 960 and (np.random.rand() > 0.25):
 						locx = frame['addrx']; locy = frame['addry']
 					else:
-						locx = np.random.randint(-dist, dist) + locx;
-						locy = np.random.randint(-dist, dist) + locy;
+						locx = np.random.randint(-dist, dist) + frame['addrx'];
+						locy = np.random.randint(-dist, dist) + frame['addry'];
 				
 				g = tpgroup.get_group((day,hour));
 				
@@ -364,7 +366,7 @@ def parallelapplydist(threads, table, grid, transprob, weibull, day):
 		superor = np.array([xmin,ymin]);
 		
 		for i in range(1,len(out)):
-			mat, xmin, ymin = out[1]
+			mat, xmin, ymin = out[i]
 			tshape = mat.shape; #(24,3,x,y)
 			matshape = np.array([tshape[2],tshape[3]])
 			mator = np.array([xmin,ymin])
@@ -392,7 +394,7 @@ def parallelapplydist(threads, table, grid, transprob, weibull, day):
 		return None;
 	
 #@profile
-def runit():
+def runit(threads):
 	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
 	
 	print("loading...")
@@ -430,32 +432,39 @@ def runit():
 	print(datetime.datetime.now().time().isoformat());
 	#rawframe = ptable.iloc[1:10000].apply(gridsum, axis=1, args=(500.0,tpgroup, weibull,3,) );
 	
+	day = int(sys.argv[1])
+	print(day)
+
 	#rawmat,x,y = parallelapplyfunc(ptable.iloc[0:10000], 500.0,transprob, weibull,3 )
-	rawmat,x,y = parallelapplydist(4, ptable.iloc[0:1000], 500.0,transprob, weibull,3 )
-	
-	#write to hdf5 w/metadata
-	out = h5py.File(datapath + 'influence.h5')
-	ds = out.create_dataset('populations',data=rawmat)
+	out = h5py.File(datapath + 'Finfluence'+str(day)+'.h5')
+	#for day in range(1,8):
+	rawmat, x, y = parallelapplydist(threads, ptable, 500.0,transprob, weibull,day )
+	ds = out.create_dataset('/population'+str(day),data=rawmat,fillvalue=0.,compression='gzip',compression_opts=9)
 	ds.attrs['xorigin'] = x * 500.0;
 	ds.attrs['yorigin'] = y * 500.0;
+	ds.attrs['day'] = day;
+	ds.attrs['date']=datetime.datetime.now().isoformat() #place holder
+	ds.attrs['grid']=500.0
+		
 	out.close();
 	
 	
 	print(datetime.datetime.now().time().isoformat());
 	print(x,y);
 	print(rawmat.shape);
-	
-	plt.matshow(rawmat[10,0])
-	plt.show()
-	plt.matshow(rawmat[11,0])
-	plt.show()
-	plt.matshow(rawmat[12,0])
-	plt.show()
+	exit();
+# 	plt.matshow(rawmat[10,0])
+# 	plt.show()
+# 	plt.matshow(rawmat[11,0])
+# 	plt.show()
+# 	plt.matshow(rawmat[12,0])
+# 	plt.show()
 
 
 
 if __name__ == '__main__':
-    runit()
+	threads = mkl.get_max_threads();
+	runit(threads)
 
 
 		

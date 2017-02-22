@@ -1,0 +1,6 @@
+/data
+/slurm
+/mathmodel-build
+/lib
+*__pycache__*
+/tags

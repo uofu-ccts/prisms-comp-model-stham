@@ -45,7 +45,7 @@ def proxMat(labels):
     return prox
 
 def labelReduce(labels):
-    labelset = set(labels);
+    labelset = set(labecode --wls);
     labelmap = { item:index for index,item in enumerate(labelset) }
     newlabels = [labelmap[b] for b in labels];
     return newlabels,len(labelset);

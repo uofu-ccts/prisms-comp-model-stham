@@ -82,8 +82,10 @@ tri = { tr:i for i,tr in enumerate(mapping) }
 itr = { i:tr for i,tr in enumerate(mapping) }
 
 
-weekdayset = [2,3,4,5,6]
-dayselectset = [2,3,4,5,6]
+#weekdayset = [2,3,4,5,6]
+#weekdayset = [1,1]
+weekdayset = [7,7]
+dayselectset = weekdayset
 
 jointable['mapped'] = jointable['TRCODE'].apply(lambda x: tri[x]);
 #jointable = jointable.iloc[]
@@ -94,20 +96,20 @@ print('Processing...')
 cases = jointable.groupby(['TUCASEID']) 
 casecount = len(cases);
 
+print(casecount)
+
 #,'TRTALONE','TERET1','TRERNHLY','TRERNWA','TEIO1OCD',
-badcols = ['TRHERNAL','TRTALONE_WK','TEIO1OICD','TEIO1OCD','TEIO1ICD','TRDTOCC1','TUYEAR','TUMONTH','TULINENO', 'TUDIARYDAY', 'TUDIARYDATE','TUFINLWGT','TUCASEID','TXABSRSN', 'TXERN', 'TXERNH1O', 'TXERNH2', 'TXERNHRO', 'TXERNHRY', 'TXERNPER', 'TXERNRT', 'TXERNUOT', 'TXERNWKP', 'TXHRFTPT', 'TXHRUSL1', 'TXHRUSL2', 'TXHRUSLT', 'TXIO1COW', 'TXIO1ICD', 'TXIO1OCD', 'TXLAYAVL', 'TXLAYLK', 'TXLFS', 'TXLKAVL', 'TXLKM1', 'TXMJOT', 'TXRET1', 'TXSCHENR', 'TXSCHFT', 'TXSCHLVL', 'TXSPEMPNOT', 'TXSPUHRS', 'TXTCC', 'TXTCCTOT', 'TXTCOC', 'TXTHH', 'TXTNOHH', 'TXTO', 'TXTOHH', 'TXTONHH']
+#badcols = ['TEERNPER','TRHERNAL','TRTALONE_WK','TEIO1OICD','TEIO1OCD','TEIO1ICD','TRDTOCC1','TUYEAR','TUMONTH','TULINENO', 'TUDIARYDAY', 'TUDIARYDATE','TUFINLWGT','TUCASEID','TXABSRSN', 'TXERN', 'TXERNH1O', 'TXERNH2', 'TXERNHRO', 'TXERNHRY', 'TXERNPER', 'TXERNRT', 'TXERNUOT', 'TXERNWKP', 'TXHRFTPT', 'TXHRUSL1', 'TXHRUSL2', 'TXHRUSLT', 'TXIO1COW', 'TXIO1ICD', 'TXIO1OCD', 'TXLAYAVL', 'TXLAYLK', 'TXLFS', 'TXLKAVL', 'TXLKM1', 'TXMJOT', 'TXRET1', 'TXSCHENR', 'TXSCHFT', 'TXSCHLVL', 'TXSPEMPNOT', 'TXSPUHRS', 'TXTCC', 'TXTCCTOT', 'TXTCOC', 'TXTHH', 'TXTNOHH', 'TXTO', 'TXTOHH', 'TXTONHH']
 #badcols = ['TUYEAR','TUMONTH','TULINENO', 'TUDIARYDAY', 'TUDIARYDATE','TUFINLWGT','TUCASEID']
-infocolumns = [col for col in infotable.columns if col not in badcols];
+#infocolumns = [col for col in infotable.columns if col not in badcols];
+goodcols = ['TEAGE','TELFS','TESCHENR','TESCHFT','TESCHLVL','TESEX','TESPEMPNOT','TESPUHRS','TRCHILDNUM','TRDPFTPT','TRHHCHILD','TRSPPRES','TRTALONE','TRTCC','TRTCCC','TRTCCC_WK','TRTCOC','TRTCHILD','TRTFAMILY','TRTHH','TRTHHFAMILY','TRTNOCHILD','TRTNOHH','TRTO','TRTOHH','TRTONHH','TRTONHHCHILD','TRTSPONLY','TRTSPOUSE','TRTUNMPART','TUBUS','TUCC2','TUCC4','TUDIS','TUDIS1','TUDIS2','TUELDER','TUELNUM','TUELFREQ','TUFWK','TUSPABS','TUSPUSFT','TUSPWK']
+infocolumns = [col for col in infotable.columns if col in goodcols];
 casecol = pd.DataFrame(infotable['TUCASEID']);
 
 
 #print(casecol);
 
-# goodcols = [ 'TEHRUSLT','TRTFAMILY','TRNUMHOU','TRTHHFAMILY','TRTCHILD','TRTOHHCHILD','TELFS','TRTCCTOT','TRTALONE' ]
-# 
-# infocolumns = [col for col in infocolumns if col in goodcols];
-
-#print(infocolumns) 
+print(infocolumns) 
 
 #exit();
 
@@ -115,7 +117,7 @@ vectors = np.zeros((casecount,actcount))
 vectors2 = np.zeros_like(infotable[infocolumns].values);
 labels = np.zeros((casecount,),dtype=np.int64);
 counts = np.zeros(actcount, dtype=np.uint32);
-secondorder = np.zeros((actcount+10,actcount), dtype=np.uint32);
+#secondorder = np.zeros((actcount+10,actcount), dtype=np.uint32);
 
 randlabel = 3;
 
@@ -182,14 +184,21 @@ split_size = 2
 sample_size = 1
 maximpure = 0.00001
 maxleaf = None
-n_est = 500
-maxdepth = 10
+n_est = 3000
+maxdepth = 6
 
 # #first pass truncation for initial labelling
 # #clf = sklearn.tree.DecisionTreeClassifier(criterion='entropy',min_samples_split=split_size,min_samples_leaf=sample_size,max_depth=80)
 # # clf = sklearn.ensemble.RandomForestClassifier(max_leaf_nodes=maxleaf,n_estimators=n_est,criterion='entropy',min_samples_split=split_size,min_samples_leaf=sample_size,max_depth=None,oob_score=True,min_impurity_split=maximpure)
 # #clf = clf.fit(unsupervector,unlabels);
 # clf = clf.fit(supervector,labels);
+
+# clf = sklearn.tree.DecisionTreeClassifier(criterion='entropy',min_samples_split=2,min_samples_leaf=50,max_depth=8)
+# clf = clf.fit(supervector,labels);
+# casecol['initlabels'] = clf.apply(supervector)
+# writeTree(imgpath + "/dtreeinit.png",clf,[str(b) for b in mapping]+infocolumns)
+
+
 
 clf = sklearn.ensemble.RandomTreesEmbedding(max_leaf_nodes=maxleaf,n_estimators=n_est,min_samples_split=split_size,min_samples_leaf=sample_size,max_depth=maxdepth,min_impurity_split=maximpure)
 
@@ -212,20 +221,23 @@ tsne = sklearn.manifold.TSNE(n_components = ncomp,perplexity=2,early_exaggeratio
 coords = tsne.fit_transform(1-prox).T
 
 
-dbscan = sklearn.cluster.DBSCAN(eps = 0.5, min_samples=3);
+dbscan = sklearn.cluster.DBSCAN(eps = 0.5, min_samples= 1);
 dblabels = dbscan.fit_predict(coords.T);
+# aggclust = sklearn.cluster.AgglomerativeClustering(n_clusters=20)
+# dblabels = aggclust.fit_predict(coords.T);
+
 dbcount = Counter(dblabels)
 print("DBSCAN labels",dbcount);
 
+#cmapp = np.linspace(0.0,1.0,10);
 cmapp = np.linspace(0.0,1.0,len(dblabels));
-#cmapp = np.linspace(0.0,1.0,densitysteps);
 colors = [ cm.jet(x) for x in cmapp ]
 np.random.shuffle(colors);
 outc = [ colors[b] if b > -1 else (0,0,0,1) for b in dblabels ];
 for i in range(ncomp):
 	for j in range(i+1,ncomp):
 		plt.scatter(coords[i],coords[j],color=outc,s=8,edgecolor='');
-		plt.title("TSVD:"+","+str(i)+","+str(j))
+		plt.title("t-SNE:"+","+str(i)+","+str(j))
 		# plt.show()
 		F = plt.gcf();
 		F.set_size_inches(8,6)
@@ -239,160 +251,23 @@ labels = dblabels;
 labels,labelsetcount = labelReduce(labels);
 labelscount = Counter(labels);
 #print("First label count: ",labelscount);
-
-# exit()
-
-#print(newvec)
-#print(type(newvec))
-
-#writeTree("irisdtree-init.png",clf,mapping)
+casecol['labels']=dblabels;
 
 
 
 
-# print("Init OOB score: ",clf.oob_score_)
-# labels = clf.apply(supervector);
-
-
-# for ind,i in enumerate(clf.estimators_):
-# 	dotdata = sklearn.tree.export_graphviz(i, feature_names=[str(b) for b in mapping]+infocolumns,out_file=None, rotate=True,class_names=True,node_ids=True);
-# 	dotdata = re.sub(r"value = \[([^]]+)\]", "", dotdata);
-# 	#print(dotdata)
-# 	g = pydotplus.graph_from_dot_data(dotdata);
-# 	g.write_png(imgpath+"/dtreeinit-"+str(ind)+".png");
-# 	break;
-
-
-# tcount = len(labels);
-
-# print("Prox mat time...")
-# prox = np.zeros( (tcount,tcount) );
-
-
-
-# lines = labels.T;
-
-# for i in range(len(lines)):
-# 	if(i%100==0): print(i,end="..",flush=True);
-# 	prox += np.equal.outer(lines[i],lines[i]);
-# print("")
-# prox = prox / float(n_est);
-
-# print([0.1,1.,5.,10.,25.,50.,75.,90.,95.,99.,99.9,99.99])
-# print(np.percentile(prox,[0.1,1.,5.,10.,25.,50.,75.,90.,95.,99.,99.9,99.99]))
-
-# cutoff = np.percentile(prox,99.9)
-
-# prox[prox < cutoff] = 0.0
-
-# plt.matshow((prox));
-# plt.colorbar();
-# F = plt.gcf();
-# F.set_size_inches(10,8)
-# F.set_dpi(300);
-# F.savefig(imgpath +"/prox.png");
-# plt.clf()
-# plt.show();
-
-# exit()
-
-
-
-# print(dbcount)
-
-# print("MDS compute...")
-
-# ncomp = 2
-
-# mds = sklearn.manifold.MDS(n_components = ncomp, dissimilarity="precomputed",metric=True)
-
-# coords = mds.fit_transform((1.0-prox)).T
-
-# for i in range(ncomp):
-# 	for j in range(i+1,ncomp):
-# 		plt.scatter(coords[i],coords[j],color='k',s=8,edgecolor='');
-# 		plt.title("MDS:"+str(i)+","+str(j))
-# 		plt.show()
-
-# print("TSNE compute...")
-
-
-# step = 0;
-# #for step in range(1):
-# print("Step ", step);
-# ncomp = 2;
-# tsne = sklearn.manifold.TSNE(n_components = ncomp,perplexity=1,early_exaggeration=100,verbose=2, metric="precomputed")
-# #tsne = sklearn.manifold.TSNE(n_components = ncomp,perplexity=1,early_exaggeration=100,verbose=2,init='pca')
-
-
-# coords = tsne.fit_transform((1-prox)).T
-# #coords = tsne.fit_transform(labels).T
-
-
-# dbscan = sklearn.cluster.DBSCAN(eps = 0.30, min_samples=5);
-
-# dblabels = dbscan.fit_predict(coords.T);
-
-# dbcount = Counter(dblabels)
-# print(dbcount)
-
-# cmapp = np.linspace(0.0,1.0,len(dblabels));
-# #cmapp = np.linspace(0.0,1.0,densitysteps);
-# colors = [ cm.jet(x) for x in cmapp ]
-# np.random.shuffle(colors);
-# outc = [ colors[b] if b > -1 else (0,0,0,1) for b in dblabels ];
-
-# for i in range(ncomp):
-# 	for j in range(i+1,ncomp):
-# 		plt.scatter(coords[i],coords[j],color=outc,s=8,edgecolor='');
-# 		plt.title("TSNE:"+str(step)+","+str(i)+","+str(j))
-# 		#plt.show()
-# 		F = plt.gcf();
-# 		F.set_size_inches(8,6)
-# 		F.set_dpi(300);
-# 		F.savefig(imgpath +"/dbscan-" +str(step) + ".png");
-# 		plt.clf();
-
-# # exit()
-# #labels = [tuple(b) for b in labels]
-
-
-# labels = dblabels;
-# labelset = set(labels);
-# #print(labelset)
-# labelmap = { item:index for index,item in enumerate(labelset) }
-# labelmap[-1]=-1
-# #print(labelmap);
-# labels = [labelmap[b] for b in labels];
-# weights = [0.0001 if b == -1 else 1.0 for b in labels];
-
-# unilabels = max(labels);
-# casecol['labels'] = labels
-# labelscount = Counter(labels);
-
-
-
-# # dotdata = sklearn.tree.export_graphviz(clf, feature_names=[str(b) for b in mapping]+infocolumns,out_file=None, rotate=True,class_names=True,node_ids=True);
-# # dotdata = re.sub(r"value = \[([^]]+)\]", "", dotdata);
-# # #print(dotdata)
-# # g = pydotplus.graph_from_dot_data(dotdata);
-# # g.write_png(imgpath+"/dtree-init.png");
-
-# print("First label count: ",labelscount);
-
-
-
-maxleaf=None;
-new_sample_size = 50
+new_maxleaf=None;
+new_sample_size = 1
 new_split_size = 2
-new_n_est = 1000
+new_n_est = 3000
+new_maxdepth = 6
 
-print("Random forest fitting...")
-clf = sklearn.ensemble.RandomForestClassifier(max_leaf_nodes=maxleaf,n_estimators=new_n_est,criterion='entropy',min_samples_split=new_split_size,min_samples_leaf=new_sample_size,oob_score=True);
+print("Random forest re-fitting...")
+clf = sklearn.ensemble.ExtraTreesClassifier(max_leaf_nodes=new_maxleaf,n_estimators=new_n_est,criterion='entropy',min_samples_split=new_split_size,min_samples_leaf=new_sample_size,max_depth=new_maxdepth);
 clf = clf.fit(supervector,labels);
 newlabels = clf.predict(supervector);
 
-print("Final OOB score: ",clf.oob_score_)
+#print("Final OOB score: ",clf.oob_score_)
 
 uninewlabels = max(newlabels);
 #newlabels = clf.apply(supervector);
@@ -404,58 +279,37 @@ newlabelscount = Counter(newlabels);
 print("New label count: ",newlabelscount);
 casecol['newlabels'] = newlabels;
 
-# print("Plotting...")
-# feat = clf.feature_importances_
-# 
-# s = np.argsort(feat);
-# 
-# fnames=[str(b) for b in mapping]+infocolumns
-# 
-# s = [(fnames[b],feat[b]) for b in s ]
-# 
-# print(s);
-# plt.bar(np.arange(0,len(feat)),feat);
-# plt.show();
 
-#infomap = list(infotable.columns)
-
-
-
-
-# for ind,i in enumerate(clf.estimators_):
-# 	dotdata = sklearn.tree.export_graphviz(i, feature_names=[str(b) for b in mapping]+infocolumns,out_file=None, rotate=True,class_names=True,node_ids=True);
-# 	dotdata = re.sub(r"value = \[([^]]+)\]", "", dotdata);
-# 	#print(dotdata)
-# 	g = pydotplus.graph_from_dot_data(dotdata);
-# 	g.write_png(imgpath+"/dtree-"+str(ind)+".png");
-# 	break;
+#second DBscan print
+cmapp = np.linspace(0.0,1.0,10);
+cmapp = np.linspace(0.0,1.0,len(newlabels));
+colors = [ cm.jet(x) for x in cmapp ]
+np.random.shuffle(colors);
+outc = [ colors[b] if b > -1 else (0,0,0,1) for b in newlabels ];
+for i in range(ncomp):
+	for j in range(i+1,ncomp):
+		plt.scatter(coords[i],coords[j],color=outc,s=8,edgecolor='');
+		plt.title("t-SNE:"+","+str(i)+","+str(j))
+		# plt.show()
+		F = plt.gcf();
+		F.set_size_inches(8,6)
+		F.set_dpi(300);
+		F.savefig(imgpath +"/dbscan-new-" +str(i)+"-"+str(j)+ ".png");
+		plt.clf();
+# casecol['newlabels'] = labels;
+# newlabels = labels
+# newlabelscount = Counter(newlabels);
 	
 newjoin = pd.merge(jointable,casecol,on='TUCASEID')
 
 
-# diffmat = np.zeros((unilabels+1, uninewlabels+1));
-# 
-# for i in casecol.iterrows():
-# 	x = i[1]['labels']
-# 	y = i[1]['newlabels']
-# 	diffmat[x][y] += 1;
-# 
-# plt.matshow(diffmat);
-# plt.xlabel("old")
-# plt.ylabel("new")
-# plt.colorbar();
-# plt.show();
-
-
-
-
-
+casecol.to_csv(imgpath+"/labels.csv")
 
 print("secondary processing...")
 
 
-clf = sklearn.tree.DecisionTreeClassifier(criterion='entropy',min_samples_split=2,min_samples_leaf=1,max_depth=8)
-clf = clf.fit(supervector,labels);
+clf = sklearn.tree.DecisionTreeClassifier(criterion='entropy',min_samples_split=2,min_samples_leaf=5,max_depth=8)
+clf = clf.fit(supervector,newlabels);
 writeTree(imgpath + "/dtreefinal.png",clf,[str(b) for b in mapping]+infocolumns)
 
 
@@ -506,10 +360,11 @@ for njg in newjoingroup:
 	sum = np.zeros(288*7)
 	dayset = {1}
 	
-	print(njg[1])
-	mdem = njg[1].groupby(["TESEX","TEAGE"]).TESEX.count()[1]
-	fdem = njg[1].groupby(["TESEX","TEAGE"]).TESEX.count()[2]
-	print(mdem,fdem);
+	#print(njg[1])
+	subsetnjg = njg[1][njg[1]['TUACTIVITY_N'] == 1]
+	mdem = subsetnjg.groupby(["TESEX","TEAGE"]).TESEX.count()[1]
+	fdem = subsetnjg.groupby(["TESEX","TEAGE"]).TESEX.count()[2]
+	#print(mdem,fdem);
 	if(type(mdem) == pd.core.series.Series): mdem.reindex(np.arange(0,101)).fillna(int(0)).plot(color='b')
 	else: print("bad mdem:",mdem,type(mdem))
 	if(type(fdem) == pd.core.series.Series): fdem.reindex(np.arange(0,101)).fillna(int(0)).plot(color='r')
@@ -609,157 +464,3 @@ for njg in newjoingroup:
 	plt.clf();
 
 
-# compnum = 10
-# 
-# print('DECOMP time...')
-# decomp = sklearn.decomposition.FastICA(n_components=compnum)#,kernel='sigmoid',n_jobs=2)
-# #decomp2 = sklearn.decomposition.FastICA(n_components=compnum)#,kernel='sigmoid',n_jobs=2)
-# 
-# outvec = decomp.fit_transform(vectors);
-# outvec = outvec.T;
-# 
-# #outvec2 = decomp2.fit_transform(vectors);
-# #outvec2 = outvec2.T;
-# 
-# # print('plotting....')
-# # # plt.plot(outvec[0],outvec[1],'o');
-# # # plt.show();
-# # 
-# # plt.ylim(0.5,compnum+0.5);
-# # for i in range(compnum):
-# # 	min = np.min(outvec[i])
-# # 	max = np.max(outvec[i]);
-# # 	
-# # 	plt.plot((outvec[i]-min)/(max-min),np.linspace(i+1,i+1,len(outvec[i])), '|');
-# # 	
-# # plt.show();
-# # 
-# # exit()
-# densitysteps = 10;
-# 
-# nvec = int(compnum);
-# print((nvec*(nvec+1))/2)
-# overlabels = np.zeros( ( (nvec*(nvec+1))/2, casecount ) );
-# c = 0;
-# for i in range(nvec):
-# 	#for j in range(i+1,len(outvec)):
-# 	for j in range(i, nvec):	
-# 		
-# #DENSITY STEP MODE	
-# 		munge = np.array([outvec[i],outvec[j]]).T
-# 		mungecount = len(munge);
-# 		#pick cell size
-# 		ptp = np.ptp(munge,axis=0);
-# 		area = ptp[0]*ptp[1];
-# 		cellarea = area / mungecount;
-# 		cellsize = np.sqrt(cellarea/np.pi)*3.0; #multiply by three to account for weird densities;
-# 		print("Cellsize:",cellsize);
-# 		labels=np.linspace(-1,-1,mungecount,dtype=np.int);
-# 		basec = 0;
-# 		density = np.ceil(np.logspace(np.ceil(np.log10(mungecount)),0.5,densitysteps))
-# 		#density = np.ceil(np.linspace(mungecount,1,30));
-# 		for ind,d in enumerate(density):
-# 			clmode = sklearn.cluster.DBSCAN(n_jobs=1,min_samples=d,eps=cellsize);
-# 			index = labels==-1;
-# 			if(len(index) < 1): break;
-# 			newlabels = clmode.fit_predict(munge[index])
-# 			newlabels[newlabels > -1] += basec;
-# 			#newlabels[newlabels > -1] = ind;
-# 			basec += (len(np.unique(newlabels))-1)
-# 			labels[index] = newlabels;
-# 
-# 		overlabels[c] = labels;
-# 		c += 1
-# 		unilabels = np.unique(labels);
-# 		print(len(unilabels));
-# 		cmapp = np.linspace(0.0,1.0,len(unilabels));
-# 		#cmapp = np.linspace(0.0,1.0,densitysteps);
-# 		colors = [ cm.plasma(x) for x in cmapp ]
-# 		np.random.shuffle(colors);
-# 		outc = [ colors[b] if b > -1 else (0,0,0,1) for b in labels ];
-# 		plt.scatter(outvec[i],outvec[j],s=13,c=outc,marker='o',label=str(i)+','+str(j),alpha=0.7,edgecolors='none')
-# 		plt.gca().set_aspect(1.0);
-# 		plt.title(str(i)+','+str(j));
-# 		plt.show();
-
-
-# overlabels = overlabels.T
-# counts = Counter([ (b[0],b[1]) for b in list(overlabels[)])
-# print(counts);
-
-
-
-
-
-
-
-#STRAIGHT UP DBSCAN
-		
-# 		munge = np.array([outvec[i],outvec[j]]).T
-# 		mungecount = len(munge);
-# 		#pick cell size
-# 		ptp = np.ptp(munge,axis=0);
-# 		area = ptp[0]*ptp[1];
-# 		cellarea = area / mungecount;
-# 		cellsize = np.sqrt(cellarea/np.pi)*3.0; #multiply by three to account for weird densities;
-# 		print("Cellsize:",cellsize);
-# 		
-# 		clmode = sklearn.cluster.DBSCAN(n_jobs=1,min_samples=10,eps=cellsize);
-# 		labels = clmode.fit_predict(munge);
-# 		
-# 		unilabels = np.unique(labels);
-# 		print(len(unilabels));
-# 		cmapp = np.linspace(0.0,1.0,len(unilabels));
-# 		colors = [ cm.jet(x) for x in cmapp ]
-# 		np.random.shuffle(colors);
-# 		outc = [ colors[b] if b > -1 else (0,0,0,1) for b in labels ];
-# 		plt.scatter(outvec[i],outvec[j],s=13,c=outc,marker='o',label=str(i)+','+str(j),alpha=0.6,edgecolors='none')
-# # 		plt.gca().set_aspect(1.0);
-# 		plt.title(str(i)+','+str(j));
-# 		plt.show();
-
-
-
-# shortlist = [3,25]
-# for i in range(len(shortlist)):
-# 	for j in range(i,len(shortlist)):
-# 		if(i == j): continue;
-# 		plt.plot(outvec[shortlist[i]],outvec[shortlist[j]],'o',label=str(i)+','+str(j),alpha=0.5)
-# # 		if(i == j): continue;
-# # 		#ax = plt.subplot(compnum,compnum,i*4+j+1);
-# # 		plt.plot(outvec[i],outvec[j],'o');
-# # 		plt.title(str(i)+','+str(j));
-# # 		plt.show();
-# plt.legend();
-# plt.show();
-# 
-# print("Casecount:", casecount);
-# 
-# counts = np.zeros(actcount, dtype=np.uint32);
-# secondorder = np.zeros((actcount+10,actcount), dtype=np.uint32);
-# 
-# for i in cases:
-# 	t = list(set(i[1]['mapped']))	
-# 	counts[t] += 1;
-# 	for k in t:
-# 		secondorder[k][t] += 1;
-# 
-# 
-# counts = counts;
-# secondorder = secondorder;
-# secondorder[actcount:(actcount+10)] = counts;
-# 
-# # altmat = counts * counts.T;
-# # np.fill_diagonal(altmat,counts)
-# # diffmat = altmat-secondorder;
-# 
-# #print(counts);
-# 
-# # plt.bar(np.arange(0,actcount,1.0),counts/casecount);
-# # plt.xticks(np.arange(0,actcount,1.0),(str(b) for b in mapping),rotation=45);
-# # plt.show();
-# 
-# plt.matshow(secondorder/casecount);
-# #plt.matshow(diffmat);
-# plt.colorbar();
-# plt.show();

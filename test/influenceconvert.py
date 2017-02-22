@@ -5,6 +5,7 @@ import datetime
 import h5py;
 import sqlite3
 import multiprocessing as mp;
+import mysql.connector
 
 
 datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"

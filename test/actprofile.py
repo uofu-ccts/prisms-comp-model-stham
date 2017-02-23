@@ -16,6 +16,25 @@ import os;
 
 np.set_printoptions(threshold=np.inf)
 
+
+def compPlot(coords, labels, prefix):
+	#cmapp = np.linspace(0.0,1.0,10);
+	ncomp = len(coords);
+	cmapp = np.linspace(0.0,1.0,len(labels));
+	colors = [ cm.jet(x) for x in cmapp ]
+	np.random.shuffle(colors);
+	outc = [ colors[b] if b > -1 else (0,0,0,1) for b in labels ];
+	for i in range(ncomp):
+		for j in range(i+1,ncomp):
+			plt.scatter(coords[i],coords[j],color=outc,s=8,edgecolor='');
+			plt.title("coords:"+","+str(i)+","+str(j))
+			# plt.show()
+			F = plt.gcf();
+			F.set_size_inches(8,6)
+			F.set_dpi(300);
+			F.savefig(prefix +"-" +str(i)+"-"+str(j)+ ".png");
+			plt.clf();
+
 def writeTree(name, clf, mapping):
     dotdata = sklearn.tree.export_graphviz(clf, feature_names=[str(b) for b in mapping],out_file=None, rotate=True,class_names=True,node_ids=True);
     dotdata = re.sub(r"value = \[([^]]+)\]", "", dotdata);
@@ -218,32 +237,18 @@ ncomp = 2;
 # coords = svd.fit_transform(labels).T;
 
 tsne = sklearn.manifold.TSNE(n_components = ncomp,perplexity=2,early_exaggeration=100,verbose=2,metric='precomputed')
-coords = tsne.fit_transform(1-prox).T
+coords = tsne.fit_transform(1-prox)
 
 
 dbscan = sklearn.cluster.DBSCAN(eps = 0.5, min_samples= 1);
-dblabels = dbscan.fit_predict(coords.T);
+dblabels = dbscan.fit_predict(coords);
 # aggclust = sklearn.cluster.AgglomerativeClustering(n_clusters=20)
 # dblabels = aggclust.fit_predict(coords.T);
 
 dbcount = Counter(dblabels)
 print("DBSCAN labels",dbcount);
 
-#cmapp = np.linspace(0.0,1.0,10);
-cmapp = np.linspace(0.0,1.0,len(dblabels));
-colors = [ cm.jet(x) for x in cmapp ]
-np.random.shuffle(colors);
-outc = [ colors[b] if b > -1 else (0,0,0,1) for b in dblabels ];
-for i in range(ncomp):
-	for j in range(i+1,ncomp):
-		plt.scatter(coords[i],coords[j],color=outc,s=8,edgecolor='');
-		plt.title("t-SNE:"+","+str(i)+","+str(j))
-		# plt.show()
-		F = plt.gcf();
-		F.set_size_inches(8,6)
-		F.set_dpi(300);
-		F.savefig(imgpath +"/dbscan-" +str(i)+"-"+str(j)+ ".png");
-		plt.clf();
+compPlot(coords.T,dblabels,imgpath+"/dbscan");
 
 
 labels = dblabels;
@@ -281,21 +286,7 @@ casecol['newlabels'] = newlabels;
 
 
 #second DBscan print
-cmapp = np.linspace(0.0,1.0,10);
-cmapp = np.linspace(0.0,1.0,len(newlabels));
-colors = [ cm.jet(x) for x in cmapp ]
-np.random.shuffle(colors);
-outc = [ colors[b] if b > -1 else (0,0,0,1) for b in newlabels ];
-for i in range(ncomp):
-	for j in range(i+1,ncomp):
-		plt.scatter(coords[i],coords[j],color=outc,s=8,edgecolor='');
-		plt.title("t-SNE:"+","+str(i)+","+str(j))
-		# plt.show()
-		F = plt.gcf();
-		F.set_size_inches(8,6)
-		F.set_dpi(300);
-		F.savefig(imgpath +"/dbscan-new-" +str(i)+"-"+str(j)+ ".png");
-		plt.clf();
+compPlot(coords.T, newlabels, imgpath+"/dbscan-new");
 # casecol['newlabels'] = labels;
 # newlabels = labels
 # newlabelscount = Counter(newlabels);

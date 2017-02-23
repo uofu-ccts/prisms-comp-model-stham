@@ -16,7 +16,7 @@ import os;
 
 np.set_printoptions(threshold=np.inf)
 
-def demoActPlot(frame,labelcolumn, prefix):
+def demoActPlot(frame,labelcolumn, dayset, prefix):
 	#prelim stuff
 	mapping = np.sort(list(set(jointable['TRCODE'])))
 	actcount = len(mapping)
@@ -87,7 +87,7 @@ def demoActPlot(frame,labelcolumn, prefix):
 			fullcode = tri[int(row['TRCODE'])]
 			
 			day =  int(row['TUDIARYDAY']) - 1;
-			day =  (0 if int(row['TUDIARYDAY']) in weekdayset else 1);
+			day =  (0 if int(row['TUDIARYDAY']) in dayset else 1);
 			dayset.add(day);
 			daycount[day] += 1;
 			
@@ -218,30 +218,31 @@ def labelReduce(labels):
     newlabels = [labelmap[b] for b in labels];
     return newlabels,len(labelset);
 
-datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
-tusepath = datapath + "timeuse/"
+
+
+###############################################
+#   BEGIN MAIN CODE
+###############################################
+datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/timeuse/"
+outpath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/test/"
 
 print("reading...")
-acttable = pd.read_csv(tusepath + "atusact_2015/atusact_2015.dat")
-infotable = pd.read_csv(tusepath + "atusresp_2015/atusresp_2015.dat")
-rosttable = pd.read_csv(tusepath + "atusrost_2015/atusrost_2015.dat")
+acttable = pd.read_csv(datapath + "atusact_2015/atusact_2015.dat")
+infotable = pd.read_csv(datapath + "atusresp_2015/atusresp_2015.dat")
+rosttable = pd.read_csv(datapath + "atusrost_2015/atusrost_2015.dat")
 
 print("fixing roster...");
-
 rosttable = rosttable[rosttable['TERRP'].apply(lambda x: x in [18,19])]
-# rosttable['TEAGE'] = rosttable['TEAGE'].apply(lambda x: x // 5);
 rosttable = rosttable.drop(['TXAGE','TXRRP','TXSEX','TULINENO','TERRP'],axis=1)
-
 
 print("joining...")
 infotable = pd.merge(infotable,rosttable,on='TUCASEID')
 jointable = pd.merge(acttable,infotable,on='TUCASEID')
 
-#jointable = pd.merge(jointable, rosttable, on='TUCASEID');
-
+#TODO: What is this?
 #force some cleanliness:
-infotable['TUCC2'] = 0
-infotable['TUCC4'] = 0
+# infotable['TUCC2'] = 0
+# infotable['TUCC4'] = 0
 
 mapping = np.sort(list(set(jointable['TRCODE'])))
 #print([(i,k) for i,k in enumerate(mapping)]);
@@ -250,22 +251,19 @@ actcount = len(mapping)
 tri = { tr:i for i,tr in enumerate(mapping) }
 itr = { i:tr for i,tr in enumerate(mapping) }
 
-
 #weekdayset = [2,3,4,5,6]
 #weekdayset = [1,1]
 weekdayset = [7,7]
-dayselectset = weekdayset
 
 jointable['mapped'] = jointable['TRCODE'].apply(lambda x: tri[x]);
-#jointable = jointable.iloc[]
-jointable = jointable[jointable['TUDIARYDAY'].apply(lambda x: x in dayselectset) ];
-infotable = infotable[infotable['TUDIARYDAY'].apply(lambda x: x in dayselectset) ];
+jointable = jointable[jointable['TUDIARYDAY'].apply(lambda x: x in weekdayset) ];
+infotable = infotable[infotable['TUDIARYDAY'].apply(lambda x: x in weekdayset) ];
 
 print('Processing...')
 cases = jointable.groupby(['TUCASEID']) 
 casecount = len(cases);
 
-print(casecount)
+print("Casecount: ",casecount)
 
 #,'TRTALONE','TERET1','TRERNHLY','TRERNWA','TEIO1OCD',
 #badcols = ['TEERNPER','TRHERNAL','TRTALONE_WK','TEIO1OICD','TEIO1OCD','TEIO1ICD','TRDTOCC1','TUYEAR','TUMONTH','TULINENO', 'TUDIARYDAY', 'TUDIARYDATE','TUFINLWGT','TUCASEID','TXABSRSN', 'TXERN', 'TXERNH1O', 'TXERNH2', 'TXERNHRO', 'TXERNHRY', 'TXERNPER', 'TXERNRT', 'TXERNUOT', 'TXERNWKP', 'TXHRFTPT', 'TXHRUSL1', 'TXHRUSL2', 'TXHRUSLT', 'TXIO1COW', 'TXIO1ICD', 'TXIO1OCD', 'TXLAYAVL', 'TXLAYLK', 'TXLFS', 'TXLKAVL', 'TXLKM1', 'TXMJOT', 'TXRET1', 'TXSCHENR', 'TXSCHFT', 'TXSCHLVL', 'TXSPEMPNOT', 'TXSPUHRS', 'TXTCC', 'TXTCCTOT', 'TXTCOC', 'TXTHH', 'TXTNOHH', 'TXTO', 'TXTOHH', 'TXTONHH']
@@ -275,63 +273,25 @@ goodcols = ['TEAGE','TELFS','TESCHENR','TESCHFT','TESCHLVL','TESEX','TESPEMPNOT'
 infocolumns = [col for col in infotable.columns if col in goodcols];
 casecol = pd.DataFrame(infotable['TUCASEID']);
 
-
-#print(casecol);
-
 print(infocolumns) 
 
 #exit();
 
 vectors = np.zeros((casecount,actcount))
 vectors2 = np.zeros_like(infotable[infocolumns].values);
-labels = np.zeros((casecount,),dtype=np.int64);
 counts = np.zeros(actcount, dtype=np.uint32);
-#secondorder = np.zeros((actcount+10,actcount), dtype=np.uint32);
-
-randlabel = 3;
 
 for ind,i in enumerate(cases):
 	t = list(set(i[1]['mapped']))
 	vectors[ind][t] += 1;
 	counts[t] += 1;
-	#print(i)
-	#print(i[1]['TUCASEID'][0]);
-	#print(infotable[infotable['TUCASEID']==i[1]['TUCASEID'][0]]);
-	#print("next");
 	vectors2[ind] = infotable[infotable['TUCASEID']==i[1]['TUCASEID'].iloc[0]][infocolumns].values;
-	#print(i,vectors2[ind]);
-	#labels[ind] = [i[0],i[1]['TUDIARYDATE'].iloc[0]]
-	#labels[ind] = np.random.randint(0,randlabel);
 	labels[ind] = ind
-	#exit();
-
-
-scount = np.sort(counts)
-
-actcutoff = 300;
-
-thresh = scount[-actcutoff];
-
-scount = np.arange(0,actcount)[counts >= thresh];
-
-#print([(b,itr[b]) for b in scount])
-
-# lookup = {};
-# lookupind = 0;
-# 
-# for ind,i in enumerate(vectors):
-# 	key = tuple(i[scount])
-# 	if key not in lookup:
-# 		lookup[key] = lookupind;
-# 		lookupind += 1;
-# 	labels[ind] = lookup[key];
-# 
-# print("Label count:", lookupind);
 
 print("Casecount:", casecount);
 
 imgpath = time.strftime("%Y-%m-%d_%H-%M-%S")
-os.mkdir(imgpath)
+os.mkdir(outpath + imgpath)
 
 print("Initial random forest fitting...")
 supervector = np.concatenate((vectors,vectors2),axis=1)
@@ -375,6 +335,7 @@ clf = sklearn.tree.DecisionTreeClassifier(criterion='entropy',min_samples_split=
 clf = clf.fit(supervector,newlabels);
 writeTree(imgpath + "/dtreefinal.png",clf,[str(b) for b in mapping]+infocolumns)
 
-def demoActPlot(newjoin, "newlabels", imgpath +"/")
+def demoActPlot(newjoin, "newlabels", weekdayset, imgpath + "/")
+
 
 

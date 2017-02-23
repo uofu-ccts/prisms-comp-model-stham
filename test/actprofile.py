@@ -17,6 +17,45 @@ import os;
 np.set_printoptions(threshold=np.inf)
 
 
+# labels = dblabels;
+# labels,labelsetcount = labelReduce(labels);
+# labelscount = Counter(labels);
+
+
+def treeRefit(vector, labels):
+	new_maxleaf=None;
+	new_sample_size = 1
+	new_split_size = 2
+	new_n_est = 3000
+	new_maxdepth = 6
+
+	clf = sklearn.ensemble.ExtraTreesClassifier(max_leaf_nodes=new_maxleaf,n_estimators=new_n_est,criterion='entropy',min_samples_split=new_split_size,min_samples_leaf=new_sample_size,max_depth=new_maxdepth);
+	clf = clf.fit(supervector,labels);
+	newlabels = clf.predict(supervector);
+	return clf, newlabels;
+
+def randoTrees(vector):
+	split_size = 2
+	sample_size = 1
+	maximpure = 0.00001
+	maxleaf = None
+	n_est = 3000
+	maxdepth = 6
+
+	clf = sklearn.ensemble.RandomTreesEmbedding(max_leaf_nodes=maxleaf,n_estimators=n_est,min_samples_split=split_size,min_samples_leaf=sample_size,max_depth=maxdepth,min_impurity_split=maximpure)
+	clf = clf.fit(supervector);
+	labels = clf.apply(supervector);
+	return clf, labels;
+
+def tsneLabelFit(prox):
+	ncomp = 2;
+	tsne = sklearn.manifold.TSNE(n_components = ncomp,perplexity=2,early_exaggeration=100,verbose=2,metric='precomputed')
+	coords = tsne.fit_transform(1-prox)
+	dbscan = sklearn.cluster.DBSCAN(eps = 0.5, min_samples= 1);
+	dblabels = dbscan.fit_predict(coords);
+	return coords,labels;
+
+
 def compPlot(coords, labels, prefix):
 	#cmapp = np.linspace(0.0,1.0,10);
 	ncomp = len(coords);
@@ -189,96 +228,21 @@ supervector = np.concatenate((vectors,vectors2),axis=1)
 
 #per http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#workings,
 #there is a means to use a two class method to estimate effectiveness
-
-# secondvector = supervector.T
-# for i in range(len(secondvector)):
-# 	np.random.shuffle(secondvector[i]);
-# secondvector = secondvector.T;
-# secondlabels = np.ones((casecount,),dtype=np.int64);
-
-# unsupervector = np.concatenate((supervector,secondvector))
-# unlabels = np.concatenate((labels, secondlabels));
-
-split_size = 2
-sample_size = 1
-maximpure = 0.00001
-maxleaf = None
-n_est = 3000
-maxdepth = 6
-
-# #first pass truncation for initial labelling
-# #clf = sklearn.tree.DecisionTreeClassifier(criterion='entropy',min_samples_split=split_size,min_samples_leaf=sample_size,max_depth=80)
-# # clf = sklearn.ensemble.RandomForestClassifier(max_leaf_nodes=maxleaf,n_estimators=n_est,criterion='entropy',min_samples_split=split_size,min_samples_leaf=sample_size,max_depth=None,oob_score=True,min_impurity_split=maximpure)
-# #clf = clf.fit(unsupervector,unlabels);
-# clf = clf.fit(supervector,labels);
-
-# clf = sklearn.tree.DecisionTreeClassifier(criterion='entropy',min_samples_split=2,min_samples_leaf=50,max_depth=8)
-# clf = clf.fit(supervector,labels);
-# casecol['initlabels'] = clf.apply(supervector)
-# writeTree(imgpath + "/dtreeinit.png",clf,[str(b) for b in mapping]+infocolumns)
-
-
-
-clf = sklearn.ensemble.RandomTreesEmbedding(max_leaf_nodes=maxleaf,n_estimators=n_est,min_samples_split=split_size,min_samples_leaf=sample_size,max_depth=maxdepth,min_impurity_split=maximpure)
-
-
-#clf = clf.fit(pseudodata,pseudolabels);
-# print("Init OOB score: ",clf.oob_score_)
-labels = clf.fit_transform(supervector);
-labels = clf.apply(supervector);
+#instead we can just use the proximity matrix method with random trees
+#without the splits, especially where there are a high number of components
+#TSNE works better than MDS in this case, but YMMV. 
+clf, labels = randoTrees(vector);
 prox = proxMat(labels);
-
-# labels = labels/np.amax(labels);
-
-
-ncomp = 2;
-
-# svd = sklearn.decomposition.TruncatedSVD(n_components=ncomp)
-# coords = svd.fit_transform(labels).T;
-
-tsne = sklearn.manifold.TSNE(n_components = ncomp,perplexity=2,early_exaggeration=100,verbose=2,metric='precomputed')
-coords = tsne.fit_transform(1-prox)
-
-
-dbscan = sklearn.cluster.DBSCAN(eps = 0.5, min_samples= 1);
-dblabels = dbscan.fit_predict(coords);
-# aggclust = sklearn.cluster.AgglomerativeClustering(n_clusters=20)
-# dblabels = aggclust.fit_predict(coords.T);
+coords, dblabels = tsneLabelFit(prox);
 
 dbcount = Counter(dblabels)
 print("DBSCAN labels",dbcount);
+casecol['labels']=dblabels;
 
 compPlot(coords.T,dblabels,imgpath+"/dbscan");
 
-
-labels = dblabels;
-
-labels,labelsetcount = labelReduce(labels);
-labelscount = Counter(labels);
-#print("First label count: ",labelscount);
-casecol['labels']=dblabels;
-
-
-
-
-new_maxleaf=None;
-new_sample_size = 1
-new_split_size = 2
-new_n_est = 3000
-new_maxdepth = 6
-
 print("Random forest re-fitting...")
-clf = sklearn.ensemble.ExtraTreesClassifier(max_leaf_nodes=new_maxleaf,n_estimators=new_n_est,criterion='entropy',min_samples_split=new_split_size,min_samples_leaf=new_sample_size,max_depth=new_maxdepth);
-clf = clf.fit(supervector,labels);
-newlabels = clf.predict(supervector);
-
-#print("Final OOB score: ",clf.oob_score_)
-
-uninewlabels = max(newlabels);
-#newlabels = clf.apply(supervector);
-# print(newlabels[0:10]) 
-# newlabels = [tuple(b) for b in newlabels]
-# print(newlabels[0:10]) 
+refitclf,newlabels = treeRefit(supervector, dblabels);
 
 newlabelscount = Counter(newlabels);
 print("New label count: ",newlabelscount);

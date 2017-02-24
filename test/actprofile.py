@@ -11,6 +11,7 @@ import sklearn.tree
 import pydotplus;
 
 from collections import Counter;
+from datetime import datetime;
 import re;
 import os;
 
@@ -132,12 +133,13 @@ def demoActPlot(frame,labelcolumn, dayset, prefix):
 
 
 
-def treeRefit(vector, labels):
+
+def treeRefit(vector, labels,depth=None):
 	new_maxleaf=None;
 	new_sample_size = 1
 	new_split_size = 2
 	new_n_est = 3000
-	new_maxdepth = 6
+	new_maxdepth = depth
 
 	clf = sklearn.ensemble.ExtraTreesClassifier(max_leaf_nodes=new_maxleaf,n_estimators=new_n_est,criterion='entropy',min_samples_split=new_split_size,min_samples_leaf=new_sample_size,max_depth=new_maxdepth);
 	clf = clf.fit(supervector,labels);
@@ -150,7 +152,7 @@ def randoTrees(vector):
 	maximpure = 0.00001
 	maxleaf = None
 	n_est = 3000
-	maxdepth = 6
+	maxdepth = 5
 
 	clf = sklearn.ensemble.RandomTreesEmbedding(max_leaf_nodes=maxleaf,n_estimators=n_est,min_samples_split=split_size,min_samples_leaf=sample_size,max_depth=maxdepth,min_impurity_split=maximpure)
 	clf = clf.fit(supervector);
@@ -239,10 +241,18 @@ print("joining...")
 infotable = pd.merge(infotable,rosttable,on='TUCASEID')
 jointable = pd.merge(acttable,infotable,on='TUCASEID')
 
-# What is this? TUCC has datetimes embedded
+# What is this? TUCC has datetimes embedded, need to translate
 # #force some cleanliness:
-infotable['TUCC2'] = 0
-infotable['TUCC4'] = 0
+
+def tuccconv(x):
+	if(x == '-1'): return -1;
+	if(x == '-2'): return -2;
+	if(x == '-3'): return -3;
+	b = datetime.strptime(x,'%H:%M:%S')
+	return b.hour*60 + b.minute;
+
+infotable['TUCC2'] = infotable['TUCC2'].apply(tuccconv);
+infotable['TUCC4'] = infotable['TUCC4'].apply(tuccconv);
 
 mapping = np.sort(list(set(jointable['TRCODE'])))
 #print([(i,k) for i,k in enumerate(mapping)]);
@@ -269,7 +279,7 @@ print("Casecount: ",casecount)
 #badcols = ['TEERNPER','TRHERNAL','TRTALONE_WK','TEIO1OICD','TEIO1OCD','TEIO1ICD','TRDTOCC1','TUYEAR','TUMONTH','TULINENO', 'TUDIARYDAY', 'TUDIARYDATE','TUFINLWGT','TUCASEID','TXABSRSN', 'TXERN', 'TXERNH1O', 'TXERNH2', 'TXERNHRO', 'TXERNHRY', 'TXERNPER', 'TXERNRT', 'TXERNUOT', 'TXERNWKP', 'TXHRFTPT', 'TXHRUSL1', 'TXHRUSL2', 'TXHRUSLT', 'TXIO1COW', 'TXIO1ICD', 'TXIO1OCD', 'TXLAYAVL', 'TXLAYLK', 'TXLFS', 'TXLKAVL', 'TXLKM1', 'TXMJOT', 'TXRET1', 'TXSCHENR', 'TXSCHFT', 'TXSCHLVL', 'TXSPEMPNOT', 'TXSPUHRS', 'TXTCC', 'TXTCCTOT', 'TXTCOC', 'TXTHH', 'TXTNOHH', 'TXTO', 'TXTOHH', 'TXTONHH']
 #badcols = ['TUYEAR','TUMONTH','TULINENO', 'TUDIARYDAY', 'TUDIARYDATE','TUFINLWGT','TUCASEID']
 #infocolumns = [col for col in infotable.columns if col not in badcols];
-goodcols = ['TEAGE','TELFS','TESCHENR','TESCHFT','TESCHLVL','TESEX','TESPEMPNOT','TESPUHRS','TRCHILDNUM','TRDPFTPT','TRHHCHILD','TRSPPRES','TRTALONE','TRTCC','TRTCCC','TRTCCC_WK','TRTCOC','TRTCHILD','TRTFAMILY','TRTHH','TRTHHFAMILY','TRTNOCHILD','TRTNOHH','TRTO','TRTOHH','TRTONHH','TRTONHHCHILD','TRTSPONLY','TRTSPOUSE','TRTUNMPART','TUBUS','TUCC2','TUCC4','TUDIS','TUDIS1','TUDIS2','TUELDER','TUELNUM','TUELFREQ','TUFWK','TUSPABS','TUSPUSFT','TUSPWK']
+goodcols = ['TEAGE','TELFS','TESCHENR','TESCHFT','TESCHLVL','TESEX','TESPEMPNOT','TESPUHRS','TRCHILDNUM','TRDPFTPT','TRHHCHILD','TRSPPRES','TRTALONE','TRTCC','TRTCCC','TRTCCC_WK','TRTCOC','TRTCHILD','TRTFAMILY','TRTHH','TRTHHFAMILY','TRTNOCHILD','TRTNOHH','TRTO','TRTOHH','TRTONHH','TRTONHHCHILD','TRTSPONLY','TRTSPOUSE','TRTUNMPART','TUBUS','TUCC2','TUCC4','TUDIS','TUDIS1','TUDIS2','TUELDER','TUELNUM','TUELFREQ','TUFWK','TUSPABS','TUSPUSFT','TUSPWK','TUFWK','TUSPWK','TEERNWKP','TUSPUSFT','TEHRUSL1','TEHRUSL2']
 infocolumns = [col for col in infotable.columns if col in goodcols];
 casecol = pd.DataFrame(infotable['TUCASEID']);
 
@@ -287,13 +297,19 @@ for ind,i in enumerate(cases):
 	counts[t] += 1;
 	vectors2[ind] = infotable[infotable['TUCASEID']==i[1]['TUCASEID'].iloc[0]][infocolumns].values;
 
+supervector = np.concatenate((vectors,vectors2),axis=1)
+supercolumns = infocolumns + [str(b) for b in mapping];
+superframe = pd.DataFrame(supervector,columns=supercolumns);
+#print(superframe)
+
 print("Casecount:", casecount);
+
 
 imgpath = outpath + time.strftime("%Y-%m-%d_%H-%M-%S")
 os.mkdir(imgpath)
 
 print("Initial random forest fitting...")
-supervector = np.concatenate((vectors,vectors2),axis=1)
+
 
 #per http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#workings,
 #there is a means to use a two class method to estimate effectiveness
@@ -311,7 +327,12 @@ casecol['labels']=dblabels;
 compPlot(coords.T,dblabels,imgpath+"/dbscan");
 
 print("Random forest re-fitting...")
-refitclf,newlabels = treeRefit(supervector, dblabels);
+refitclf,newlabels = treeRefit(supervector, dblabels, depth = 5);
+
+tempcoord = refitclf.apply(supervector)
+tempprox = proxMat(labels)
+tempcoords,templabels = tsneLabelFit(tempprox);
+compPlot(tempcoords.T,newlabels,imgpath+"/dbscan-refit");
 
 labelscount = Counter(newlabels);
 print("New label count: ",labelscount);
@@ -324,9 +345,24 @@ compPlot(coords.T, newlabels, imgpath+"/dbscan-new");
 # newlabels = labels
 # labelscount = Counter(newlabels);
 	
+
+
+print("Subset calculations....")
+limitcols = ['TEAGE','TESEX','TELFS','TRCHILDNUM']
+subframe = superframe[limitcols].copy();
+subframe['TELFS'] = subframe['TELFS'].apply(lambda x: 1 if (x == 1 or x == 2) else 0);
+subvector = subframe.values;
+limitclf, limitlabels = treeRefit(subvector,newlabels);
+limitcount = Counter(limitlabels);
+print("Limit count: ", limitcount)
+casecol['limitlabels'] = limitlabels;
+print("Percent same labels ", np.sum(casecol['limitlabels']==casecol['newlabels'])/casecount*100)
+
+
 newjoin = pd.merge(jointable,casecol,on='TUCASEID')
 
 casecol.to_csv(imgpath+"/labels.csv")
+
 
 print("secondary processing...")
 

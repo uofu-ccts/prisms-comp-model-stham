@@ -18,7 +18,7 @@ np.set_printoptions(threshold=np.inf)
 
 def demoActPlot(frame,labelcolumn, dayset, prefix):
 	#prelim stuff
-	mapping = np.sort(list(set(jointable['TRCODE'])))
+	mapping = np.sort(list(set(frame['TRCODE'])))
 	actcount = len(mapping)
 	tri = { tr:i for i,tr in enumerate(mapping) }
 	
@@ -163,7 +163,7 @@ def tsneLabelFit(prox):
 	coords = tsne.fit_transform(1-prox)
 	dbscan = sklearn.cluster.DBSCAN(eps = 0.5, min_samples= 1);
 	dblabels = dbscan.fit_predict(coords);
-	return coords,labels;
+	return coords,dblabels;
 
 
 def compPlot(coords, labels, prefix):
@@ -239,10 +239,10 @@ print("joining...")
 infotable = pd.merge(infotable,rosttable,on='TUCASEID')
 jointable = pd.merge(acttable,infotable,on='TUCASEID')
 
-#TODO: What is this?
-#force some cleanliness:
-# infotable['TUCC2'] = 0
-# infotable['TUCC4'] = 0
+# What is this? TUCC has datetimes embedded
+# #force some cleanliness:
+infotable['TUCC2'] = 0
+infotable['TUCC4'] = 0
 
 mapping = np.sort(list(set(jointable['TRCODE'])))
 #print([(i,k) for i,k in enumerate(mapping)]);
@@ -286,12 +286,11 @@ for ind,i in enumerate(cases):
 	vectors[ind][t] += 1;
 	counts[t] += 1;
 	vectors2[ind] = infotable[infotable['TUCASEID']==i[1]['TUCASEID'].iloc[0]][infocolumns].values;
-	labels[ind] = ind
 
 print("Casecount:", casecount);
 
-imgpath = time.strftime("%Y-%m-%d_%H-%M-%S")
-os.mkdir(outpath + imgpath)
+imgpath = outpath + time.strftime("%Y-%m-%d_%H-%M-%S")
+os.mkdir(imgpath)
 
 print("Initial random forest fitting...")
 supervector = np.concatenate((vectors,vectors2),axis=1)
@@ -301,7 +300,7 @@ supervector = np.concatenate((vectors,vectors2),axis=1)
 #instead we can just use the proximity matrix method with random trees
 #without the splits, especially where there are a high number of components
 #TSNE works better than MDS in this case, but YMMV. 
-clf, labels = randoTrees(vector);
+clf, labels = randoTrees(supervector);
 prox = proxMat(labels);
 coords, dblabels = tsneLabelFit(prox);
 
@@ -335,7 +334,7 @@ clf = sklearn.tree.DecisionTreeClassifier(criterion='entropy',min_samples_split=
 clf = clf.fit(supervector,newlabels);
 writeTree(imgpath + "/dtreefinal.png",clf,[str(b) for b in mapping]+infocolumns)
 
-def demoActPlot(newjoin, "newlabels", weekdayset, imgpath + "/")
+demoActPlot(newjoin, "newlabels", weekdayset, imgpath + "/")
 
 
 

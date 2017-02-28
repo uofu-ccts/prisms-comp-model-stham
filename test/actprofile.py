@@ -15,8 +15,14 @@ from datetime import datetime;
 import re;
 import os;
 
+pd.set_option('display.max_rows', 600)
 np.set_printoptions(threshold=np.inf)
 
+def featureSort(clf,names):
+	feats = clf.feature_importances_
+	df = pd.DataFrame({'feat':feats,'names':names});
+	df = df.sort('feat')[:5:-1]
+	return df;
 def demoActPlot(frame,labelcolumn, dayset, prefix):
 	#prelim stuff
 	mapping = np.sort(list(set(frame['TRCODE'])))
@@ -141,9 +147,9 @@ def treeRefit(vector, labels,depth=None):
 	new_n_est = 3000
 	new_maxdepth = depth
 
-	clf = sklearn.ensemble.ExtraTreesClassifier(max_leaf_nodes=new_maxleaf,n_estimators=new_n_est,criterion='entropy',min_samples_split=new_split_size,min_samples_leaf=new_sample_size,max_depth=new_maxdepth);
-	clf = clf.fit(supervector,labels);
-	newlabels = clf.predict(supervector);
+	clf = sklearn.ensemble.RandomForestClassifier(max_leaf_nodes=new_maxleaf,n_estimators=new_n_est,criterion='entropy',min_samples_split=new_split_size,min_samples_leaf=new_sample_size,max_depth=new_maxdepth);
+	clf = clf.fit(vector,labels);
+	newlabels = clf.predict(vector);
 	return clf, newlabels;
 
 def randoTrees(vector):
@@ -155,8 +161,8 @@ def randoTrees(vector):
 	maxdepth = 5
 
 	clf = sklearn.ensemble.RandomTreesEmbedding(max_leaf_nodes=maxleaf,n_estimators=n_est,min_samples_split=split_size,min_samples_leaf=sample_size,max_depth=maxdepth,min_impurity_split=maximpure)
-	clf = clf.fit(supervector);
-	labels = clf.apply(supervector);
+	clf = clf.fit(vector);
+	labels = clf.apply(vector);
 	return clf, labels;
 
 def tsneLabelFit(prox):
@@ -173,7 +179,7 @@ def compPlot(coords, labels, prefix):
 	ncomp = len(coords);
 	cmapp = np.linspace(0.0,1.0,len(labels));
 	colors = [ cm.jet(x) for x in cmapp ]
-	np.random.shuffle(colors);
+	#np.random.shuffle(colors);
 	outc = [ colors[b] if b > -1 else (0,0,0,1) for b in labels ];
 	for i in range(ncomp):
 		for j in range(i+1,ncomp):
@@ -261,9 +267,9 @@ actcount = len(mapping)
 tri = { tr:i for i,tr in enumerate(mapping) }
 itr = { i:tr for i,tr in enumerate(mapping) }
 
-#weekdayset = [2,3,4,5,6]
+weekdayset = [2,3,4,5,6]
 #weekdayset = [1,1]
-weekdayset = [7,7]
+#weekdayset = [7,7]
 
 jointable['mapped'] = jointable['TRCODE'].apply(lambda x: tri[x]);
 jointable = jointable[jointable['TUDIARYDAY'].apply(lambda x: x in weekdayset) ];
@@ -279,7 +285,7 @@ print("Casecount: ",casecount)
 #badcols = ['TEERNPER','TRHERNAL','TRTALONE_WK','TEIO1OICD','TEIO1OCD','TEIO1ICD','TRDTOCC1','TUYEAR','TUMONTH','TULINENO', 'TUDIARYDAY', 'TUDIARYDATE','TUFINLWGT','TUCASEID','TXABSRSN', 'TXERN', 'TXERNH1O', 'TXERNH2', 'TXERNHRO', 'TXERNHRY', 'TXERNPER', 'TXERNRT', 'TXERNUOT', 'TXERNWKP', 'TXHRFTPT', 'TXHRUSL1', 'TXHRUSL2', 'TXHRUSLT', 'TXIO1COW', 'TXIO1ICD', 'TXIO1OCD', 'TXLAYAVL', 'TXLAYLK', 'TXLFS', 'TXLKAVL', 'TXLKM1', 'TXMJOT', 'TXRET1', 'TXSCHENR', 'TXSCHFT', 'TXSCHLVL', 'TXSPEMPNOT', 'TXSPUHRS', 'TXTCC', 'TXTCCTOT', 'TXTCOC', 'TXTHH', 'TXTNOHH', 'TXTO', 'TXTOHH', 'TXTONHH']
 #badcols = ['TUYEAR','TUMONTH','TULINENO', 'TUDIARYDAY', 'TUDIARYDATE','TUFINLWGT','TUCASEID']
 #infocolumns = [col for col in infotable.columns if col not in badcols];
-goodcols = ['TEAGE','TELFS','TESCHENR','TESCHFT','TESCHLVL','TESEX','TESPEMPNOT','TESPUHRS','TRCHILDNUM','TRDPFTPT','TRHHCHILD','TRSPPRES','TRTALONE','TRTCC','TRTCCC','TRTCCC_WK','TRTCOC','TRTCHILD','TRTFAMILY','TRTHH','TRTHHFAMILY','TRTNOCHILD','TRTNOHH','TRTO','TRTOHH','TRTONHH','TRTONHHCHILD','TRTSPONLY','TRTSPOUSE','TRTUNMPART','TUBUS','TUCC2','TUCC4','TUDIS','TUDIS1','TUDIS2','TUELDER','TUELNUM','TUELFREQ','TUFWK','TUSPABS','TUSPUSFT','TUSPWK','TUFWK','TUSPWK','TEERNWKP','TUSPUSFT','TEHRUSL1','TEHRUSL2']
+goodcols = ['TEAGE', 'TEERNWKP', 'TEHRUSL1', 'TEHRUSL2', 'TELFS', 'TESCHENR', 'TESCHFT', 'TESCHLVL', 'TESEX', 'TESPEMPNOT', 'TESPUHRS', 'TRCHILDNUM', 'TRDPFTPT', 'TRHHCHILD', 'TRSPPRES', 'TUCC2', 'TUCC4', 'TUDIS2', 'TUELNUM', 'TUSPUSFT']
 infocolumns = [col for col in infotable.columns if col in goodcols];
 casecol = pd.DataFrame(infotable['TUCASEID']);
 
@@ -300,6 +306,11 @@ for ind,i in enumerate(cases):
 supervector = np.concatenate((vectors,vectors2),axis=1)
 supercolumns = infocolumns + [str(b) for b in mapping];
 superframe = pd.DataFrame(supervector,columns=supercolumns);
+superframe = superframe.set_index(infotable.index);
+
+
+
+
 #print(superframe)
 
 print("Casecount:", casecount);
@@ -329,10 +340,10 @@ compPlot(coords.T,dblabels,imgpath+"/dbscan");
 print("Random forest re-fitting...")
 refitclf,newlabels = treeRefit(supervector, dblabels, depth = 5);
 
-tempcoord = refitclf.apply(supervector)
-tempprox = proxMat(labels)
-tempcoords,templabels = tsneLabelFit(tempprox);
-compPlot(tempcoords.T,newlabels,imgpath+"/dbscan-refit");
+# tempcoord = refitclf.apply(supervector)
+# tempprox = proxMat(labels)
+# tempcoords,templabels = tsneLabelFit(tempprox);
+# compPlot(tempcoords.T,newlabels,imgpath+"/dbscan-refit");
 
 labelscount = Counter(newlabels);
 print("New label count: ",labelscount);
@@ -341,28 +352,54 @@ casecol['newlabels'] = newlabels;
 
 #second DBscan print
 compPlot(coords.T, newlabels, imgpath+"/dbscan-new");
-# casecol['newlabels'] = labels;
-# newlabels = labels
-# labelscount = Counter(newlabels);
-	
+
+
+#small group relabeling
+print("running the relabel functions...")
+sizecutoff = 50;
+
+relabelfunc = np.vectorize(lambda x: x if labelscount[x] >= sizecutoff else -1);
+relabel = relabelfunc(newlabels);
+#print(len(relabel))
+
+casecol['relabels'] = relabel;
+labelscount = Counter(relabel);
+print("Relabel count: ",labelscount);
+
+relabelframe = superframe[casecol['relabels'] > -1];
+
+tsubset = casecol[casecol['relabels'] > -1]['relabels'].values
+relabelclf,fixedlabels=treeRefit(relabelframe.values,tsubset,depth=None);
+
+   
+print(featureSort(relabelclf,supercolumns));
+
+renewlabels = relabelclf.predict(supervector);
+compPlot(coords.T,renewlabels,imgpath+"/dbscan-relabel");
+casecol['relabels'] = renewlabels;
+labelscount = Counter(renewlabels);
+print("Final count: ",labelscount);
 
 
 print("Subset calculations....")
-limitcols = ['TEAGE','TESEX','TELFS','TRCHILDNUM']
+#limitcols = ['TEAGE','TESEX','TELFS','TRCHILDNUM']
+limitcols = goodcols;
 subframe = superframe[limitcols].copy();
-subframe['TELFS'] = subframe['TELFS'].apply(lambda x: 1 if (x == 1 or x == 2) else 0);
+#subframe['TELFS'] = subframe['TELFS'].apply(lambda x: 1 if (x == 1 or x == 2) else 0);
 subvector = subframe.values;
-limitclf, limitlabels = treeRefit(subvector,newlabels);
+limitclf, limitlabels = treeRefit(subvector,renewlabels,depth=None);
+print(featureSort(limitclf,limitcols));
 limitcount = Counter(limitlabels);
 print("Limit count: ", limitcount)
 casecol['limitlabels'] = limitlabels;
-print("Percent same labels ", np.sum(casecol['limitlabels']==casecol['newlabels'])/casecount*100)
+print("Percent same labels ", np.sum(casecol['limitlabels']==casecol['relabels'])/casecount*100)
 
 
 newjoin = pd.merge(jointable,casecol,on='TUCASEID')
 
 casecol.to_csv(imgpath+"/labels.csv")
 
+#exit()
 
 print("secondary processing...")
 
@@ -370,7 +407,8 @@ clf = sklearn.tree.DecisionTreeClassifier(criterion='entropy',min_samples_split=
 clf = clf.fit(supervector,newlabels);
 writeTree(imgpath + "/dtreefinal.png",clf,[str(b) for b in mapping]+infocolumns)
 
-demoActPlot(newjoin, "newlabels", weekdayset, imgpath + "/")
+demoActPlot(newjoin, "relabels", weekdayset, imgpath + "/relabel-")
+demoActPlot(newjoin, "limitlabels", weekdayset, imgpath + "/limit-")
 
 
 

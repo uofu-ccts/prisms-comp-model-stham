@@ -9,6 +9,7 @@ import sklearn.cluster
 import sklearn.ensemble
 import sklearn.tree
 import pydotplus;
+from multiprocessing import Pool;
 
 from collections import Counter;
 from datetime import datetime;
@@ -20,12 +21,23 @@ np.set_printoptions(threshold=np.inf)
 ###############################################
 #   DEFINES
 ###############################################
+def dbscangrid(coords,prefix):
+	coordsT = coords.T;
+	eps = [0.1,0.2,0.3,0.4,0.5]
+	sample = [1,2,3,5,10,20,50,100]
+	for i in eps:
+		for j in sample:
+			dbscan = sklearn.cluster.DBSCAN(eps=i, min_samples=j);
+			dblabels = dbscan.fit_predict(coords);
+			compPlot(coordsT,dblabels,prefix+"-"+str(i)+"-"+str(j));
+
 def featureSort(clf,names):
 	feats = clf.feature_importances_
 	df = pd.DataFrame({'feat':feats,'names':names});
 	df = df.sort_values('feat',ascending=False)
 	return df;
-def demoActPlot(frame,labelcolumn, dayset, prefix):
+def demoActPlot(frame,labelcolumn, prefix):
+	weekdayset = [2,3,4,5,6]
 	#prelim stuff
 	mapping = np.sort(list(set(frame['TRCODE'])))
 	actcount = len(mapping)
@@ -96,7 +108,7 @@ def demoActPlot(frame,labelcolumn, dayset, prefix):
 			fullcode = tri[int(row['TRCODE'])]
 			
 			day =  int(row['TUDIARYDAY']) - 1;
-			day =  (0 if int(row['TUDIARYDAY']) in dayset else 1);
+			day =  (0 if int(row['TUDIARYDAY']) in weekdayset else 1);
 			dayset.add(day);
 			daycount[day] += 1;
 			
@@ -142,44 +154,72 @@ def demoActPlot(frame,labelcolumn, dayset, prefix):
 
 
 
-def treeRefit(vector, labels,depth=None):
+def treeRefit(vector, labels,depth=None,nest = 500):
 	new_maxleaf=None;
 	new_sample_size = 1
 	new_split_size = 2
-	new_n_est = 1000
+	#steps = nest // 100
+	#new_n_est = nest // steps
+	new_n_est = nest
+	
 	new_maxdepth = depth
 
-	clf = sklearn.ensemble.ExtraTreesClassifier(max_leaf_nodes=new_maxleaf,n_estimators=new_n_est,criterion='entropy',min_samples_split=new_split_size,min_samples_leaf=new_sample_size,max_depth=new_maxdepth);
+	clf = sklearn.ensemble.ExtraTreesClassifier(n_jobs=1,max_leaf_nodes=new_maxleaf,n_estimators=new_n_est,criterion='entropy',min_samples_split=new_split_size,min_samples_leaf=new_sample_size,max_depth=new_maxdepth);
+	
 	clf = clf.fit(vector,labels);
+
+	#warm start fix for solving the out of control mem issue ???
+	#for n in range(steps):
+	#	clf = clf.fit(vector,labels);
+	#	clf.n_estimators += new_n_est;
+	
+
 	newlabels = clf.predict(vector);
 	return clf, newlabels;
 
-def randoTrees(vector):
+def randoTreeRefit(vector, labels,depth=None,nest = 500):
+	new_maxleaf=None;
+	new_sample_size = 1
+	new_split_size = 2
+	new_n_est = nest
+	
+	new_maxdepth = depth
+
+	clf = sklearn.ensemble.RandomTreesEmbedding(n_jobs=1,max_leaf_nodes=new_maxleaf,n_estimators=new_n_est,min_samples_split=new_split_size,min_samples_leaf=new_sample_size,max_depth=new_maxdepth);
+	
+	clf = clf.fit(vector,labels);	
+
+	newlabels = clf.predict(vector);
+	return clf, newlabels;
+
+def randoTrees(vector, depth=5, nest = 500):
 	split_size = 2
 	sample_size = 1
 	maximpure = 0.00001
 	maxleaf = None
-	n_est = 1000
-	maxdepth = 5
+	n_est = nest
+	maxdepth = depth
 
 	clf = sklearn.ensemble.RandomTreesEmbedding(max_leaf_nodes=maxleaf,n_estimators=n_est,min_samples_split=split_size,min_samples_leaf=sample_size,max_depth=maxdepth,min_impurity_split=maximpure)
 	clf = clf.fit(vector);
 	labels = clf.apply(vector);
 	return clf, labels;
 
-def tsneLabelFit(prox):
+def tsneLabelFit(prox, eps = 0.5, samples = 1):
 	ncomp = 2;
-	tsne = sklearn.manifold.TSNE(n_components = ncomp,perplexity=2,early_exaggeration=100,verbose=2,metric='precomputed')
+	tsne = sklearn.manifold.TSNE(n_components = ncomp,perplexity=30,early_exaggeration=4.0,verbose=2,metric='precomputed')
 	coords = tsne.fit_transform(1-prox)
-	dbscan = sklearn.cluster.DBSCAN(eps = 0.5, min_samples= 1);
+	dbscan = sklearn.cluster.DBSCAN(eps = eps, min_samples= samples);
 	dblabels = dbscan.fit_predict(coords);
 	return coords,dblabels;
 
 
 def compPlot(coords, labels, prefix):
-	#cmapp = np.linspace(0.0,1.0,10);
+	neglabels = labels == -1
+	labels = labelReduce(labels);
+	labels[neglabels] = -1;
 	ncomp = len(coords);
-	cmapp = np.linspace(0.0,1.0,len(labels));
+	cmapp = np.linspace(0.0,1.0,len(set(labels)));
 	colors = [ cm.jet(x) for x in cmapp ]
 	#np.random.shuffle(colors);
 	outc = [ colors[b] if b > -1 else (0,0,0,1) for b in labels ];
@@ -195,38 +235,62 @@ def compPlot(coords, labels, prefix):
 			plt.clf();
 
 def writeTree(name, clf, mapping):
-    dotdata = sklearn.tree.export_graphviz(clf, feature_names=[str(b) for b in mapping],out_file=None, rotate=True,class_names=True,node_ids=True);
-    dotdata = re.sub(r"value = \[([^]]+)\]", "", dotdata);
-    #print(dotdata)
-    g = pydotplus.graph_from_dot_data(dotdata);
-    g.write_png(name);
+	dotdata = sklearn.tree.export_graphviz(clf, feature_names=[str(b) for b in mapping],out_file=None, rotate=True,class_names=True,node_ids=True);
+	dotdata = re.sub(r"value = \[([^]]+)\]", "", dotdata);
+	#print(dotdata)
+	g = pydotplus.graph_from_dot_data(dotdata);
+	g.write_png(name);
 
+
+def outerequal(x):
+	tcount = len(x[0]);
+	prox = np.zeros( (tcount,tcount) );
+	for i in range(len(x)):
+		prox += np.equal.outer(x[i],x[i]);
+
+	return prox;
 
 def proxMat(labels):
-    print("Calculating proximity matrix...")
-    tcount = len(labels);
-    n_est = len(labels[0]);
+	print("Calculating proximity matrix...")
+	tcount = len(labels);
+	n_est = len(labels[0]);
 
-    prox = np.zeros( (tcount,tcount) );
+	prox = np.zeros( (tcount,tcount) );
 
-    lines = labels.T;
+	proccount = 8
 
-    for i in range(len(lines)):
-        #if(i%100==0): print(i,end="..",flush=True);
-        prox += np.equal.outer(lines[i],lines[i]);
-    #print("")
-    prox = prox / float(n_est);
+	pool = Pool(proccount);
 
-    print("Proximity percentiles...")
-    print([0.1,1.,5.,10.,25.,50.,75.,90.,95.,99.,99.9,99.99])
-    print(np.percentile(prox,[0.1,1.,5.,10.,25.,50.,75.,90.,95.,99.,99.9,99.99]))
-    return prox
+	lines = labels.T;
+
+	#llen = len(lines)
+	#tick = llen // 100;
+	#for i in range(len(lines)):
+	#	if(i%tick==0): print(i//tick,end="..",flush=True);
+	#	prox += np.equal.outer(lines[i],lines[i]);
+
+	split = np.array_split(lines,proccount);
+
+	result = pool.map(outerequal, split);
+	
+	for i in range(len(result)):
+		prox += result[i];
+
+	pool.close();
+
+	#print("  ")
+	prox = prox / float(n_est);
+
+	print("Proximity percentiles...")
+	print([0.1,1.,5.,10.,25.,50.,75.,90.,95.,99.,99.9,99.99])
+	print(np.percentile(prox,[0.1,1.,5.,10.,25.,50.,75.,90.,95.,99.,99.9,99.99]))
+	return prox
 
 def labelReduce(labels):
-    labelset = set(labecode --wls);
-    labelmap = { item:index for index,item in enumerate(labelset) }
-    newlabels = [labelmap[b] for b in labels];
-    return newlabels,len(labelset);
+	labelset = set(labels);
+	labelmap = { item:index for index,item in enumerate(labelset) }
+	newlabels = np.array([labelmap[b] for b in labels]);
+	return newlabels;
 
 def tuccconv(x):
 	if(x == '-1'): return -1;
@@ -248,7 +312,12 @@ def labelCutoff(frame, labels, cutoff):
 	relabel = relabel[relabel > -1];
 	return relabelframe, relabel;
 
-def determineLabels(frame, columns, name, path, cutoff = 50):
+def stripUnlabelled(frame,labels,badlabel):
+	stripframe = frame[labels > -1]
+	striplabel = labels[labels > -1]
+	return stripframe, striplabel;
+
+def determineLabels(frame, columns, name, path, cutoff = 50, eps=0.3, samples=10):
 	#per http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#workings,
 	#there is a means to use a two class method to estimate effectiveness
 	#instead we can just use the proximity matrix method with random trees
@@ -260,26 +329,30 @@ def determineLabels(frame, columns, name, path, cutoff = 50):
 	vector = subframe.values;
 
 	print("Initial random forest fitting...")
-	initclf, initlabels = randoTrees(vector);
+	initclf, initlabels = randoTrees(vector,depth=5,nest=1000);
 	prox = proxMat(initlabels);
-	coords, dblabels = tsneLabelFit(prox);
+	coords, dblabels = tsneLabelFit(prox, eps=eps, samples = samples);
 	coordsT = coords.T;
 
-	print("Init label count: ",len(Counter(dblabels)))
+	#dbscangrid(coords,path+"/"+name+"-dbscan-grid")
+
+	print("Init label count: ",len(Counter(dblabels))-1)
 	compPlot(coordsT,dblabels,path+"/"+name+"-dbscan-init");
 	labelframe[name+'labelinit'] = dblabels;
 
 	print("Random forest re-fitting...")
-	refitclf,refitlabels = treeRefit(vector, dblabels, depth = 5);
+	stripvector, striplabels = stripUnlabelled(subframe, dblabels, -1)
+	print("Stripped size: ", len(striplabels));
+	refitclf,refitlabels = treeRefit(stripvector, striplabels, depth=6, nest=2000);
+	refitlabels = refitclf.predict(vector);
 
 	print("Refit label count: ",len(Counter(refitlabels)))
 	compPlot(coordsT,refitlabels,path+"/"+name+"-dbscan-refit");
 	labelframe[name+'labelrefit'] = refitlabels;
 
-
 	print("Relabeling sets with size <", cutoff, "...")
 	reducedframe, reducedlabels = labelCutoff(subframe, refitlabels, cutoff);
-	relabelclf,reducedlabels=treeRefit(reducedframe.values,reducedlabels,depth=None);
+	relabelclf,reducedlabels=treeRefit(reducedframe.values,reducedlabels,depth=None, nest=2000);
 	reducedlabels = relabelclf.predict(vector);
 
 	print("Reduced label count: ",len(Counter(reducedlabels)))
@@ -323,15 +396,15 @@ actcount = len(mapping)
 tri = { tr:i for i,tr in enumerate(mapping) }
 itr = { i:tr for i,tr in enumerate(mapping) }
 
-#weekdayset = [2,3,4,5,6]
-#weekdayset = [1,1]
-#weekdayset = [7,7]
-#weekdayset = [2,2]
-weekdayset = [1,2,3,4,5,6,7]
+#daypick = [2,3,4,5,6]
+#daypick = [1,1]
+#daypick = [7,7]
+#daypick = [2,2]
+daypick = [1,2,3,4,5,6,7]
 
 acttable['mapped'] = acttable['TRCODE'].apply(lambda x: tri[x]);
-acttable = acttable[acttable['TUDIARYDAY'].apply(lambda x: x in weekdayset) ];
-infotable = infotable[infotable['TUDIARYDAY'].apply(lambda x: x in weekdayset) ];
+acttable = acttable[acttable['TUDIARYDAY'].apply(lambda x: x in daypick) ];
+infotable = infotable[infotable['TUDIARYDAY'].apply(lambda x: x in daypick) ];
 
 print('Processing...')
 cases = acttable.groupby(['TUCASEID']) 
@@ -357,24 +430,31 @@ os.mkdir(imgpath)
 
 
 goodcols = ['TEAGE', 'TEERNWKP', 'TEHRUSL1', 'TEHRUSL2', 'TELFS', 'TESCHENR', 'TESCHFT', 'TESCHLVL', 'TESEX', 'TESPEMPNOT', 'TESPUHRS', 'TRCHILDNUM', 'TRDPFTPT', 'TRHHCHILD', 'TRSPPRES', 'TUCC2', 'TUCC4', 'TUDIS2', 'TUELNUM', 'TUSPUSFT']
-casecol,firstimport = determineLabels(superframe, goodcols, "first", imgpath, cutoff = 30);
 
+fullcols = goodcols + ['TUDIARYDAY','10101', '10102', '10199', '10201', '10299', '10301', '10399', '10401', '20101', '20102', '20103', '20104', '20199', '20201', '20202', '20203', '20299', '20301', '20302', '20303', '20399', '20401', '20402', '20499', '20501', '20502', '20601', '20602', '20699', '20701', '20799', '20801', '20899', '20901', '20902', '20903', '20904', '20905', '20999', '29999', '30101', '30102', '30103', '30104', '30105', '30106', '30108', '30109', '30110', '30111', '30112', '30199', '30201', '30202', '30203', '30204', '30299', '30301', '30302', '30303', '30399', '30401', '30402', '30403', '30404', '30405', '30499', '30501', '30502', '30503', '30504', '30599', '40101', '40102', '40103', '40104', '40105', '40106', '40108', '40109', '40110', '40111', '40112', '40199', '40201', '40202', '40301', '40302', '40303', '40399', '40401', '40402', '40403', '40404', '40405', '40499', '40501', '40502', '40503', '40504', '40505', '40506', '40507', '40508', '40599', '49999', '50101', '50102', '50103', '50104', '50199', '50201', '50202', '50203', '50299', '50301', '50302', '50303', '50304', '50399', '50401', '50403', '50404', '50499', '59999', '60101', '60102', '60103', '60104', '60199', '60201', '60202', '60203', '60204', '60299', '60301', '60302', '60399', '60401', '60402', '60499', '69999', '70101', '70102', '70103', '70104', '70105', '70201', '80101', '80102', '80201', '80202', '80203', '80301', '80401', '80402', '80403', '80499', '80501', '80502', '80601', '80701', '80702', '89999', '90101', '90102', '90103', '90104', '90199', '90201', '90202', '90299', '90301', '90302', '90399', '90401', '90501', '90502', '90599', '99999', '100101', '100102', '100103', '100199', '100201', '100299', '100304', '100305', '100401', '110101', '110201', '120101', '120201', '120202', '120299', '120301', '120302', '120303', '120304', '120305', '120306', '120307', '120308', '120309', '120310', '120311', '120312', '120313', '120399', '120401', '120402', '120403', '120404', '120405', '120499', '120501', '120502', '120503', '120504', '130101', '130102', '130103', '130104', '130105', '130106', '130107', '130108', '130109', '130110', '130112', '130113', '130114', '130115', '130116', '130117', '130118', '130119', '130120', '130122', '130124', '130125', '130126', '130127', '130128', '130129', '130130', '130131', '130132', '130133', '130134', '130135', '130136', '130199', '130202', '130203', '130207', '130210', '130212', '130213', '130216', '130218', '130219', '130220', '130222', '130223', '130224', '130225', '130226', '130227', '130229', '130232', '130299', '130301', '130302', '139999', '140101', '140102', '140103', '140105', '149999', '150101', '150102', '150103', '150104', '150105', '150106', '150199', '150201', '150202', '150203', '150204', '150299', '150301', '150302', '150399', '150401', '150402', '150501', '150601', '150602', '150699', '150701', '150801', '159999', '160101', '160102', '160103', '160104', '160105', '160106', '160107', '160108', '160199', '160201', '180101', '180201', '180202', '180203', '180204', '180205', '180206', '180207', '180208', '180209', '180299', '180301', '180302', '180303', '180304', '180305', '180401', '180402', '180403', '180404', '180405', '180499', '180501', '180502', '180503', '180504', '180599', '180601', '180602', '180603', '180604', '180699', '180701', '180702', '180703', '180704', '180801', '180802', '180803', '180804', '180805', '180806', '180807', '180899', '180901', '180902', '180903', '180904', '180905', '180999', '181001', '181002', '181101', '181201', '181202', '181203', '181204', '181205', '181299', '181301', '181302', '181399', '181401', '181501', '181599', '181601', '181801', '189999', '500101', '500103', '500105', '500106', '500107']
+
+firstcol,firstimport = determineLabels(superframe, goodcols, "first", imgpath, cutoff = 65, eps=0.3,samples=10);
+secondcol,secondimport = determineLabels(superframe, fullcols, "second", imgpath, cutoff = 65,eps=0.2,samples=20);
+
+casecol = pd.merge(firstcol,secondcol,on='TUCASEID')
 
 print(firstimport)
+print(secondimport)
 #print("Percent same labels ", np.sum(casecol['first']==casecol['relabels'])/casecount*100)
 
 casecol.to_csv(imgpath+"/labels.csv")
 
+
 print("secondary processing...")
 labelledacttable = pd.merge(acttable,casecol,on='TUCASEID')
 
-clf = sklearn.tree.DecisionTreeClassifier(criterion='entropy',min_samples_split=2,min_samples_leaf=5,max_depth=8)
-subframe = columnStrip(superframe,goodcols)
-clf = clf.fit(subframe.values,casecol['firstlabelreduce'].values);
-writeTree(imgpath + "/dtreefinal.png",clf,subframe.columns)
+#clf = sklearn.tree.DecisionTreeClassifier(criterion='entropy',min_samples_split=2,min_samples_leaf=5,max_depth=8)
+#subframe = columnStrip(superframe,goodcols)
+#clf = clf.fit(subframe.values,casecol['firstlabelreduce'].values);
+#writeTree(imgpath + "/dtreefinal.png",clf,subframe.columns)
 
-demoActPlot(labelledacttable, "firstlabelreduce", weekdayset, imgpath + "/relabel-")
-
+demoActPlot(labelledacttable, "firstlabelreduce", imgpath + "/goodcol-")
+demoActPlot(labelledacttable, "secondlabelreduce", imgpath + "/fullcol-")
 
 
 

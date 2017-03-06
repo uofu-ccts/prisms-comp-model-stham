@@ -203,6 +203,7 @@ def	assignHouseholds(t):
 				x.householder = 0;
 				x.group = False;
 				x.mobile = True;
+				x.spouse = -1;
 				indvs+=[x]
 		
 		#assign adult males		
@@ -222,6 +223,7 @@ def	assignHouseholds(t):
 				x.householder = 0;
 				x.group = False;
 				x.mobile = True;
+				x.spouse = -1;
 				indvs+=[x]
 						
 		#assign female children
@@ -238,7 +240,8 @@ def	assignHouseholds(t):
 				x.household = -1;
 				x.householder = 0;
 				x.group = False;
-				x.mobile = True;
+				x.mobile = True;Shen - Symbol Range
+				x.spouse = -1;
 				indvs+=[x]
 				
 		#assign male children
@@ -256,6 +259,7 @@ def	assignHouseholds(t):
 				x.householder = 0;
 				x.group = False;
 				x.mobile = True;
+				x.spouse = -1;
 				indvs+=[x]
 		
 		#pick householders
@@ -537,7 +541,8 @@ def	assignHouseholds(t):
 				spselect = hhcand[s]#
 				indvs[spselect].household = h;
 				households[h].size += 1;
-		
+				indvs[spselect].spouse = households[h].hh
+				indvs[households[h].hh].spouse = spselect;
 
 		
 
@@ -644,6 +649,7 @@ def	assignHouseholds(t):
 			indvs[i].household += hpop;
 			indvs[i].g1 += cpop;
 			indvs[i].g2 += cpop;
+			indvs[i].spouse += cpop;
 				
 # 		#print([ (x.age,x.household,x.householder) for x in indvs ])
 # 		if(index == 490351008003005):
@@ -762,6 +768,7 @@ def saveData(indvs):
 		('addrn', lambda b:b.address[1] ),
 		('city', lambda b:b.address[2] ),
 		('id', lambda b:b.id ),
+		('spouse',lambda b:b.spouse ),
 	]
 	#cpop = 0;
 	for i in expr:
@@ -815,7 +822,7 @@ def main():
 	print("Prepping for write...")
 	indvs = saveData(indvs);
 	print("Writing to file...")
-	con = sqlite3.connect("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/indvs.sq3");
+	con = sqlite3.connect("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/indvs2.sq3");
 	indvs.to_sql('indvs',con);
 	con.close();
 	#out.to_pickle("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/assigned.pickle")

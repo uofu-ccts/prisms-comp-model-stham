@@ -240,7 +240,7 @@ def	assignHouseholds(t):
 				x.household = -1;
 				x.householder = 0;
 				x.group = False;
-				x.mobile = True;Shen - Symbol Range
+				x.mobile = True;
 				x.spouse = -1;
 				indvs+=[x]
 				

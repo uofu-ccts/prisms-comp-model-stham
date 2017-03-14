@@ -795,9 +795,9 @@ def convaddr(addrs):
 def main():
 	
 	print("Loading census tables...")
-	#tables = loadCensusTables()
+	tables = loadCensusTables()
 	print("Assigning household structure...");
-	#indvs = assignHouseholds(tables)
+	indvs = assignHouseholds(tables)
 	
 	#saveData(indvs);
 	
@@ -813,7 +813,7 @@ def main():
 	addresses = assignPoints(pts,idx,addr,loc);
 	
 	outaddr = convaddr(addresses);
-	con = sqlite3.connect("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/blockaddr.sq3");
+	con = sqlite3.connect("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/blockaddr2.sq3");
 	outaddr.to_sql('blockaddr',con);
 	con.close();
 

@@ -5,18 +5,22 @@ import collections;
 
 datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
 
-#load indvs
-con = sqlite3.connect(datapath + "indvs.sq3");
-indvs = pd.read_sql("select * from indvs", con);
-con.close();
-#load locations
-con = sqlite3.connect(datapath + "blockaddr.sq3");
-blockaddr = pd.read_sql("select * from blockaddr", con);
-con.close();
+# #load indvs
+# con = sqlite3.connect(datapath + "indvs.sq3");
+# indvs = pd.read_sql("select * from indvs", con);
+# con.close();
+# #load locations
+# con = sqlite3.connect(datapath + "blockaddr.sq3");
+# blockaddr = pd.read_sql("select * from blockaddr", con);
+# con.close();
 #load LEHD tables
 odmat = pd.read_csv(datapath + "lehd/ut_od_main_JT00_2014.csv")
 #rac = pd.read_csv(datapath + "lehd/ut_rac_S000_JT00_2014.csv")
 wac = pd.read_csv(datapath + "lehd/ut_wac_S000_JT00_2014.csv")
+
+youngtab = pd.read_csv(datapath + "employ/ACS_15_5YR_B23022_with_ann.csv",skiprows=[1])
+oldtab = pd.read_csv(datapath + "employ/ACS_15_5YR_B23026_with_ann.csv",skiprows=[1])
+agetab = pd.read_csv(datapath + "employ/ACS_15_5YR_B23001_with_ann.csv",skiprows=[1])
 
 # print(indvs)
 # print(blockaddr)
@@ -24,15 +28,54 @@ wac = pd.read_csv(datapath + "lehd/ut_wac_S000_JT00_2014.csv")
 # print(rac)
 # print(wac)
 
+#hours/weeks scheduling
+agebrackets = [16,20,22,25,30,35,45,55,60,62,65,70,75,101];
+
+ageindices = np.array([3,10,17,24,31,38,45,52,59,66,73,79,85])
+agediff = list(np.diff(ageindices) - 2);
+agediff += [agediff[len(agediff)-1]]
+print(agediff)
+ageshift = [0,92-3]
+
+probbracket = []
+for i in ageshift:
+	temp = [];
+	for j,k in zip(ageindices,agediff):
+		print(j,k)
+		total = agetab['HD01_VD'+str(i+j).zfill(2)][0]
+		nonemploy = agetab['HD01_VD'+str(i+j+k).zfill(2)][0]
+		nonlabor = agetab['HD01_VD'+str(i+j+k+1).zfill(2)][0]
+		employ = total - nonemploy - nonlabor
+		temp += [employ / total];
+	probbracket += [temp]
+
+
+print(agebrackets);
+print(probbracket);
+
+hourbrackets = [0,1,15,35];
+weekbrackets = [0,1,14,27,40,48,50];
+
+
+
+exit()
+
+
 out = pd.DataFrame();
 
 out['id'] = indvs['id'];
 out['block'] = indvs['block'];
-out['age'] = indvs['age'].apply(lambda x: 0 if x >= 15 else 1);
+out['gender'] = indvs['gender'];
+out['age'] = indvs['age']
 out['empblock'] = -1
 out['empx'] = 0.0;
 out['empy'] = 0.0;
 out['empcode'] = -1; 
+out['hours']=0 #determines daily schedule
+out['weeks']=0 #determines weekly work prob
+out['shift']=0 #determines normal shift, or alternative shift
+out['probemploy'] = out.apply(calcprob,args=(ageprobtables), axis=1);
+
 
 gout = out.groupby(['block'])
 
@@ -59,12 +102,15 @@ for g,df in gout:
 		
 		np.random.shuffle(wlist);
 		
-		max = len(df) if len(odg) > len(df) else len(odg)
-		out.loc[df.index[:max],['empblock']] = wlist[:max];
+		maxnum = len(df) if len(odg) > len(df) else len(odg)
+		out.loc[df.index[:maxnum],['empblock']] = wlist[:maxnum];
 		#print(out.iloc[df.index])
 
 # 	c+=1;
 # 	if(c == 3): break;
+
+
+
 
 
 	

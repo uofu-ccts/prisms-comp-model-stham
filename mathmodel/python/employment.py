@@ -2,6 +2,7 @@ import pandas as pd;
 import numpy as np;
 import sqlite3;
 import collections;
+import time;
 
 datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
 
@@ -22,6 +23,7 @@ wac = pd.read_csv(datapath + "lehd/ut_wac_S000_JT00_2014.csv")
 youngtab = pd.read_csv(datapath + "employ/ACS_15_5YR_B23022_with_ann.csv",skiprows=[1])
 oldtab = pd.read_csv(datapath + "employ/ACS_15_5YR_B23026_with_ann.csv",skiprows=[1])
 agetab = pd.read_csv(datapath + "employ/ACS_15_5YR_B23001_with_ann.csv",skiprows=[1])
+shifttab = pd.read_csv(datapath + "employ/shifttable.csv");
 
 # print(indvs)
 # print(blockaddr)
@@ -29,7 +31,7 @@ agetab = pd.read_csv(datapath + "employ/ACS_15_5YR_B23001_with_ann.csv",skiprows
 # print(rac)
 # print(wac)
 
-indvs = indvs.iloc[0:1000];
+#indvs = indvs.iloc[0:1000];
 
 
 print("building brackets...")
@@ -63,8 +65,11 @@ hourbrackets = [(1,15),(15,35),(35,60)];
 weekbrackets = [(50,52),(48,50),(40,48),(27,40),(14,27),(1,14)];
 hourweekbrackets = []
 for i in hourbrackets:
+	ir = range(i[0],i[1])
 	for j in weekbrackets:
-		hourweekbrackets += [(i,j)]
+		jr = range(j[0],j[1]);
+		hourweekbrackets += [(ir,jr)]
+
 
 def hourbracketbuild(table):
 	totalindices = [4,29];
@@ -83,9 +88,24 @@ def hourbracketbuild(table):
 		bracket += [temp]
 	return bracket;
 
+#print(hourweekbrackets)
 youngbracket = hourbracketbuild(youngtab)
 oldbracket = hourbracketbuild(oldtab);
+#print(youngbracket)
 
+
+#shiftclasses:
+#-1 -  no shift
+#0 - normal: 9 am to 5 pm or thereabouts
+#1 - evening: 2 pm to midnight
+#2 - night: 9 pm to 8 am
+#3 - rotating: could be day, evening, night
+#4 - split: two daytime shifts
+#5 - irregular: totally random
+#6 - other: ill defined, so roll into irregular
+shifttab['maxage'] = shifttab['maxage'].apply(lambda x: x + 1)
+shiftbracket = list(shifttab['minage'])+[shifttab['maxage'].iloc[-1]]
+shiftp = shifttab[['normshift','evening','night','rotating','split','irregular','other']].as_matrix();
 
 #in the future I could interpolate with a lower bound cutoff 
 #instead of using the bracket system, but this is inconsequential at the moment
@@ -98,10 +118,11 @@ def calcprob(x,agebrackets,prob):
 	for i in range(len(agebrackets) - 1):
 		if(x.age < agebrackets[i+1] and x.age >= agebrackets[i]):
 			p = prob[int(x.gender)][i];
-			p = 1.0 if p > np.random.random() else p;
+			#this is not the place to calculate the probability because
+			#we might want the values later
+			#p = 1.0 if p > np.random.random() else p;
 			return p;
 	return 0.0;
-
 
 
 print("building outframe...")
@@ -116,15 +137,15 @@ out['empblock'] = -1
 out['empx'] = 0.0;
 out['empy'] = 0.0;
 out['empcode'] = -1; 
-out['hours']=0 #determines daily schedule
-out['weeks']=0 #determines weekly work prob
-out['shift']=0 #determines normal shift, or alternative shift
+out['emphours']=0 #determines daily schedule
+out['empweeks']=0 #determines weekly work prob
+out['empshift']=-1 #determines normal shift, or alternative shift
 out['probemploy'] = out.apply(calcprob, args=(agebrackets,probbracket), axis=1);
 
 
 
 print("assigning blocks...")
-print(out);
+#print(out);
 
 gout = out.groupby(['block'])
 
@@ -134,8 +155,15 @@ c = 0;
 for g,df in gout:
 	#print(g)
 	#print(df)
+
+	#introduce some randomness into the employment profile 
+	#for realistic weighted employment profiles
+	df['probemploy'] = df['probemploy'].apply(lambda x: 1.0 if x > np.random.random() else x);
+
 	df = df.sort_values('probemploy',axis=0,ascending=False)
 	
+
+
 	dfcount = np.sum(df['probemploy'] > 0.0);
 	#print(df)
 	if(g in odout.indices):
@@ -155,7 +183,7 @@ for g,df in gout:
 		
 		#maxnum = len(df) if len(odg) > len(df) else len(odg)
 		maxnum = dfcount if len(odg) > dfcount else len(odg);
-		print('maxnum: ',maxnum);
+		#print('maxnum: ',maxnum);
 		out.loc[df.index[:maxnum],['empblock']] = wlist[:maxnum];
 		#print(out.iloc[df.index])
 
@@ -163,21 +191,39 @@ for g,df in gout:
 # 	if(c == 3): break;
 
 print("assigning employment address...")
+
 	
 gout = out.groupby(['empblock'])
 bgroup = blockaddr.groupby(['block'])
 
-def pickxycode(x,bg,wg):
+def pickemployclass(x,bg,wg,hw,young,old,shiftbracket,shiftp):
 	if(x['empblock'] != -1):
 		sz = len(bg)
 		pick = np.random.randint(0,sz);
 		x['empx'] = bg.iloc[pick]['addrx']
 		x['empy'] = bg.iloc[pick]['addry']
 		x['empcode'] = np.random.choice(20,p=wg);
-	return x;
+
+		p = young;	
+		if(x['age'] >= 65): p = old;
+
+		pick = np.random.choice( range(len(hw)) , p=p[int(x['gender'])] )
+		x['emphours'] = np.random.choice(hw[pick][0])
+		x['empweeks'] = np.random.choice(hw[pick][1])
+		
+		shiftpick = np.random.choice(range(7), p=shiftp[0])
+		for i in range(len(shiftbracket) - 1):
+			if(x.age < shiftbracket[i+1] and x.age >= shiftbracket[i]):
+				shiftpick = np.random.choice(range(7), p=shiftp[i]);
+		x['empshift'] = shiftpick;
+
+	return x
 
 
-	
+#load the employment category
+#this is probably unrealistic, but there isn't a 
+#good way to calculate the actual employment codes 
+#for diverse groups.
 cols = []
 for i in range(1,21):
 	cols += ["CNS"+str(i).zfill(2)]
@@ -190,7 +236,9 @@ for g,df in gout:
 		wg = np.array(wac.loc[(wac['w_geocode'] == g), cols].iloc[0])
 		wg = wg/np.sum(wg);
 
-		out.loc[df.index] = df.apply(pickxycode,axis=1,args=(bg,wg,));
+		#out.loc[df.index] = df.apply(pickxycode,axis=1,args=(bg,wg));
+		out.loc[df.index] = df.apply(pickemployclass,axis=1,args=(bg,wg,hourweekbrackets,youngbracket,oldbracket,shiftbracket,shiftp));
+
 
 		#print(out.loc[df.index])
 
@@ -200,13 +248,14 @@ for g,df in gout:
 
 print("writing...");
 
+out['id'] = out['id'].astype(int);
 out = out.drop('block',axis=1);
 out = out.drop('age',axis=1);
 out = out.drop('gender',axis=1);
-print(out);
 
-exit()
-con = sqlite3.connect("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/employ-"+time.strftime("%Y-%m-%d_%H-%M-%S")+".sq3");
+
+#con = sqlite3.connect("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/employ-"+time.strftime("%Y-%m-%d_%H-%M-%S")+".sq3");
+con = sqlite3.connect("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/employ2.sq3");
 out.to_sql('employ',con);
 con.close();
 

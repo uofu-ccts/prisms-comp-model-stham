@@ -13,13 +13,13 @@ def labelReduce(labels):
 
 datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/test/"
 
-labels = pd.read_csv(datapath+"2017-03-02_17-41-57/labels.csv")
+labels = pd.read_csv(datapath+"2017-03-21_12-11-50/labels.csv")
 
-#labels['finallabels']=labelReduce(labels['finallabels'].values);
-#labels['secondlabelreduce']=labelReduce(labels['secondlabelreduce'].values);
+labels['casetypelabelreduce']=labelReduce(labels['casetypelabelreduce'].values);
+labels['daytypelabelreduce']=labelReduce(labels['daytypelabelreduce'].values);
 
-g = labels.groupby(["finallabels","secondlabelreduce"])
-c = g.finallabels.count()
+g = labels.groupby(["casetypelabelreduce","daytypelabelreduce"])
+c = g.casetypelabelreduce.count()
 print(c)
 
 xy,z = zip(*c.iteritems())
@@ -34,7 +34,7 @@ y = np.array(y)
 z = np.array(z)
 z_arr[x,y]=z
 
-z_arr = z_arr.T
+#z_arr = z_arr.T
 
 z_arr[z_arr == 0] = np.NaN;
 
@@ -44,6 +44,6 @@ plt.colorbar(im1);
 ax2 = plt.subplot(1,2,2)
 im2 = ax2.matshow(np.log10(z_arr),cmap='viridis_r')
 plt.colorbar(im2)
-print("Percent same labels ", np.sum(labels['finallabels']==labels['secondlabelreduce'])/len(labels)*100)
+print("Percent same labels ", np.sum(labels['casetypelabelreduce']==labels['daytypelabelreduce'])/len(labels)*100)
 plt.show()
 

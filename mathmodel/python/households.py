@@ -649,7 +649,7 @@ def	assignHouseholds(t):
 			indvs[i].household += hpop;
 			indvs[i].g1 += cpop;
 			indvs[i].g2 += cpop;
-			indvs[i].spouse += cpop;
+			if(indvs[i].spouse > -1): indvs[i].spouse += cpop;
 				
 # 		#print([ (x.age,x.household,x.householder) for x in indvs ])
 # 		if(index == 490351008003005):

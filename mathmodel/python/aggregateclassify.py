@@ -38,6 +38,9 @@ print(mergetab);
 
 #clf = joblib.load(datapath + "NEEDPATH")
 
+
+print("transforming dataset to classfier...")
+
 goodcols = ['TEAGE', 'TEHRUSL1', 'TELFS', 'TESCHENR', 'TESCHFT', 'TESCHLVL', 'TESEX', 'TESPEMPNOT', 'TESPUHRS', 'TRCHILDNUM', 'TRDPFTPT', 'TRHHCHILD', 'TRSPPRES', 'TUDIS2', 'TUELNUM', 'TUSPUSFT']
 
 mux = pd.DataFrame();
@@ -121,6 +124,7 @@ mux['TUELNUM'] = -1;
 mux['TRSPPRES'] = 3
 mux['TESPEMPNOT'] = -1
 mux['TESPUHRS'] = -1
+mux['TUSPUSFT'] = -1
 
 for gr,df in householdg:
 
@@ -134,12 +138,29 @@ for gr,df in householdg:
 	if(eld == 0): eld = -1;
 
 	sp = df[df['spouse']>-1];
-	
+	#implicitely, there are only two spouses in a household because of
+	#how households are constructed. 
+	if(len(sp) > 0):
+		a = sp.iloc[0];
+		b = sp.iloc[1];
+		#print(a.id,b.id)
+		trsppres = trsppresClass(a.age,b.age);
+		mux.loc[a.id,['TRSPPRES']] = trsppres;
+		mux.loc[b.id,['TRSPPRES']] = trsppres;
+		mux.loc[a.id,['TESPEMPNOT']] = 1 if b.emphours > 0 else 2;
+		mux.loc[b.id,['TESPEMPNOT']] = 1 if a.emphours > 0 else 2;
+		mux.loc[a.id,['TESPUHRS']] = b.emphours;
+		mux.loc[b.id,['TESPUHRS']] = a.emphours;
+		mux.loc[a.id,['TUSPUSFT']] = 1 if b.emphours > 35 else 2;
+		mux.loc[b.id,['TUSPUSFT']] = 1 if a.emphours > 35 else 2;
+
+
 	mux.loc[df.index,['TRCHILDNUM']] = child;
 	mux.loc[df.index,['TUELNUM']] = eld;
 
-#mux['TRCHILDNUM'] = 
-#mux['TUELNUM'] =
+#this value has a low low low feature importance because it doesn't say very much
+#mux['TUSPUSFT'] = mux['TESPUHRS'].apply(lambda x: 1 if x > 35 else -1)
+
 
 #mux['hh'] = mergetab['household']
 
@@ -155,8 +176,5 @@ mux['TRHHCHILD'] = mux['TRCHILDNUM'].apply(lambda x: 1 if x > 0 else 2);
 
 mux['TUDIS2'] = mergetab['mobile'].apply(lambda x: (1 if 0.5 > np.random.random() else 2) if x < 1 else -1);
 
-
-#this value has a low low low feature importance because it doesn't say very much
-#mux['TUSPUSFT'] = mux['TESPUHRS'].apply(lambda x: 1 if x > 35 else -1)
-
 print(mux)
+print(mux.columns)

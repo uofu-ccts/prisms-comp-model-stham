@@ -16,27 +16,28 @@ datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
 
 print("loading...")
 
-
 con = sqlite3.connect(datapath + "indvs2.sq3");
-indvs = pd.read_sql("select * from indvs limit 1000", con);
+indvs = pd.read_sql("select * from indvs", con);
 #age,g1,g2,gender,household,householder,group,mobile,block,addrx,addry,addrn,city,id,spouse
 con.close();
 con = sqlite3.connect(datapath + "employ2.sq3");
-employ = pd.read_sql("select * from employ limit 1000", con);
+employ = pd.read_sql("select * from employ", con);
 #id,empblock,empx,empy,empcode,emphours,empweeks,empshift,probemploy
 con.close();
 con = sqlite3.connect(datapath + "school2.sq3");
-school = pd.read_sql("select * from school limit 1000", con);
+school = pd.read_sql("select * from school", con);
 #id,schoolprob,schoollevel
 con.close();
 
 mergetab = pd.merge(indvs,employ,on='id')
 mergetab = pd.merge(mergetab,school,on='id')
 mergetab = mergetab.drop(['index','index_x','index_y'],axis=1)
-print(mergetab.columns);
-print(mergetab);
+# print(mergetab.columns);
+# print(mergetab);
 
-#clf = joblib.load(datapath + "NEEDPATH")
+clfpath = datapath + "final-label-classifier/clfsave-casetype.pkl"
+#print(clfpath)
+clf = joblib.load(clfpath)
 
 
 print("transforming dataset to classfier...")
@@ -176,5 +177,21 @@ mux['TRHHCHILD'] = mux['TRCHILDNUM'].apply(lambda x: 1 if x > 0 else 2);
 
 mux['TUDIS2'] = mergetab['mobile'].apply(lambda x: (1 if 0.5 > np.random.random() else 2) if x < 1 else -1);
 
-print(mux)
-print(mux.columns)
+# print(mux)
+# print(mux.columns)
+
+
+print("classifying...")
+
+out = pd.DataFrame();
+out['id'] = mergetab['id']
+
+labels = clf.predict(mux[goodcols].values)
+out['casetype'] = labels;
+
+#print(out);
+
+print("writing...")
+
+out.to_csv(datapath + "indvlabels.csv")
+

@@ -213,30 +213,47 @@ def indchild(frame, tpgroup, weibull,day):
 	return actlist;
 			
 
+
 #how to defer?
 #WE PRETEND THAT THE CHILD IS AN ADULT
-def depchild(frame,tpgroup, weibull, day):
-	return adult(frame,tpgroup, weibull, day);
+def depchild(frame,tables, day):
+	return adult(frame,tables, day);
 
 
 
-def superfunc(frame, tpgroup, weibull, day):
+def daypick(frame,tables,day):
+	
+	#actlist += [(t,act,locx,locy)]	
+	actlist = [];
+
+	#determine school/work fixed params
+	#pick a day type
+	#determine dependent status and school needs
+	#select mandatory and common acts from sched table w/locs
+	#build activity sequence using weibull for variance
+	
+	return actlist;
+
+
+def superfunc(frame, tables, day):
 	#mobile or non-mobile?
 	if frame['mobile'] == False:
 		return nonmobile(frame)
 	else:
-		if frame['age'] > 18:
-			return adult(frame, tpgroup, weibull, day);
-		else:
-			if frame['age'] > 6:
-				return indchild(frame, tpgroup, weibull, day);
-			else:
-				return depchild(frame, tpgroup, weibull, day);
+		return daypick(frame,tables,day);
+		#OLD STUFF
+		# if frame['age'] > 18:
+		# 	return adult(frame, tables, day);
+		# else:
+		# 	if frame['age'] > 6:
+		# 		return indchild(frame, tables, day);
+		# 	else:
+		# 		return depchild(frame, tables, day);
 
 #takes the superfunction and gets the horuly grid location activity profile of the user 
-def gridsum( frame, grid, tpgroup, weibull, day):
+def gridsum( frame, grid, tables, day):
 	
-	superout = pd.DataFrame(superfunc(frame,tpgroup, weibull, day));
+	superout = pd.DataFrame(superfunc(frame,tables, day));
 
 	superout.columns = ['t','act','locx','locy']
 	#align
@@ -299,12 +316,12 @@ def gridsum( frame, grid, tpgroup, weibull, day):
 	return mat, xmin, ymin;
 
 #@profile
-def parallelapplyfunc(table, grid, transprob, weibull, day):
+def parallelapplyfunc(table, grid, tables, day):
 	
 	tpgroup = transprob.groupby(['day','hour']);
 	
 	if(len(table) > 0):
-		supermat,xmin,ymin = gridsum(table.iloc[0], grid, tpgroup, weibull, day);
+		supermat,xmin,ymin = gridsum(table.iloc[0], grid, tables, day);
 		tshape = supermat.shape; #(24,3,x,y)
 		supershape = np.array([tshape[2],tshape[3]])
 		superor = np.array([xmin,ymin]);
@@ -312,7 +329,7 @@ def parallelapplyfunc(table, grid, transprob, weibull, day):
 		#print('s',superor,supershape)
 		
 		for i in range(1,table.shape[0]):
-			mat, xmin, ymin = gridsum(table.iloc[i], grid, tpgroup, weibull, day);
+			mat, xmin, ymin = gridsum(table.iloc[i], grid, tables, day);
 			tshape = mat.shape; #(24,3,x,y)
 			matshape = np.array([tshape[2],tshape[3]])
 			mator = np.array([xmin,ymin])
@@ -338,7 +355,7 @@ def parallelapplyfunc(table, grid, transprob, weibull, day):
 			
 		return supermat, superor[0], superor[1];	
 
-def parallelapplydist(threads, table, grid, transprob, weibull, day):
+def parallelapplydist(threads, table, grid, tables, day):
 	#split table
 	
 	splittable = []
@@ -351,7 +368,7 @@ def parallelapplydist(threads, table, grid, transprob, weibull, day):
 		if e > tsize: e = tsize;
 		st = table.iloc[int(s):int(e)]
 		#splittable += [(table.iloc[int(s):int(e)],grid,tpgroup,weibull,day)];
-		splittable += [(st,grid,transprob,weibull,day)]
+		splittable += [(st,grid,tables,day)]
 	
 	p = mp.Pool(threads);
 	
@@ -427,6 +444,7 @@ def runit(threads):
 	con.close();
 	weibull = weibull.set_index('ID');
 	
+	commontables = (weibull, 
 	
 	print("processing...")
 	print(datetime.datetime.now().time().isoformat());
@@ -438,7 +456,7 @@ def runit(threads):
 	#rawmat,x,y = parallelapplyfunc(ptable.iloc[0:10000], 500.0,transprob, weibull,3 )
 	out = h5py.File(datapath + 'Finfluence'+str(day)+'.h5')
 	#for day in range(1,8):
-	rawmat, x, y = parallelapplydist(threads, ptable, 500.0,transprob, weibull,day )
+	rawmat, x, y = parallelapplydist(threads, ptable, 500.0,commontables,day )
 	ds = out.create_dataset('/population'+str(day),data=rawmat,fillvalue=0.,compression='gzip',compression_opts=9)
 	ds.attrs['xorigin'] = x * 500.0;
 	ds.attrs['yorigin'] = y * 500.0;

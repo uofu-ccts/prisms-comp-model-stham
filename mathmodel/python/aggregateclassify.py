@@ -16,16 +16,18 @@ datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
 
 print("loading...")
 
+limiter = ""
+
 con = sqlite3.connect(datapath + "indvs2.sq3");
-indvs = pd.read_sql("select * from indvs", con);
+indvs = pd.read_sql("select * from indvs" + limiter, con);
 #age,g1,g2,gender,household,householder,group,mobile,block,addrx,addry,addrn,city,id,spouse
 con.close();
 con = sqlite3.connect(datapath + "employ2.sq3");
-employ = pd.read_sql("select * from employ", con);
+employ = pd.read_sql("select * from employ" + limiter, con);
 #id,empblock,empx,empy,empcode,emphours,empweeks,empshift,probemploy
 con.close();
 con = sqlite3.connect(datapath + "school2.sq3");
-school = pd.read_sql("select * from school", con);
+school = pd.read_sql("select * from school" + limiter, con);
 #id,schoolprob,schoollevel
 con.close();
 
@@ -34,6 +36,18 @@ mergetab = pd.merge(mergetab,school,on='id')
 mergetab = mergetab.drop(['index','index_x','index_y'],axis=1)
 # print(mergetab.columns);
 # print(mergetab);
+
+alttab = mergetab[mergetab['spouse'] > -1]
+
+alttab = alttab[['spouse','emphours','age']].set_index('spouse')
+
+
+#print(mergetab.columns,alttab.columns);
+
+mergetab = mergetab.join(alttab,how='left',rsuffix='sp')
+
+#print(mergetab[['spouse','age','agesp','emphours','emphourssp']])
+
 
 clfpath = datapath + "final-label-classifier/clfsave-casetype.pkl"
 #print(clfpath)
@@ -98,7 +112,7 @@ mux['TESEX'] = mergetab['gender'].apply(lambda x: x+1);
 
 
 
-householdg = mergetab.groupby('household')
+
 
 def trsppresClass(a,b):
 	#in order to deal with class 2 (unmarried partner present)
@@ -120,13 +134,33 @@ def trsppresClass(a,b):
 
 #mux['TRSPPRES'] 
 
-mux['TRCHILDNUM'] = 0;
-mux['TUELNUM'] = -1;
-mux['TRSPPRES'] = 3
-mux['TESPEMPNOT'] = -1
-mux['TESPUHRS'] = -1
-mux['TUSPUSFT'] = -1
+# mux['TRCHILDNUM'] = 0;
+# mux['TUELNUM'] = -1;
+# mux['TRSPPRES'] = 3
+# mux['TESPEMPNOT'] = -1
+# mux['TESPUHRS'] = -1
+# mux['TUSPUSFT'] = -1
 
+print(" spousemerging....")
+
+householdg = mergetab.groupby('household')
+
+def spouseapply(x):
+	#default values for non-spousal stuff
+	if(x.spouse == -1):
+		return 3,-1,-1,-1
+	sppres = trsppresClass(x.age,x.agesp)
+	empnot = 1 if x.emphourssp > 0 else 2;
+	spuhrs = x.emphourssp
+	spusft = 1 if x.emphourssp > 35 else 2;
+
+	return sppres,empnot,spuhrs,spusft;
+
+mux['TRSPPRES'],mux['TESPEMPNOT'],mux['TESPUHRS'],mux['TUSPUSFT'] = zip(*mergetab.apply(spouseapply,axis=1))
+
+print(" hhcounts...")
+
+hhcounts = {}
 for gr,df in householdg:
 
 	child = 0; eld = 0
@@ -137,34 +171,18 @@ for gr,df in householdg:
 
 	#0 elders does not exist
 	if(eld == 0): eld = -1;
+	hhcounts[gr] = (child,eld);
 
-	sp = df[df['spouse']>-1];
-	#implicitely, there are only two spouses in a household because of
-	#how households are constructed. 
-	if(len(sp) > 0):
-		a = sp.iloc[0];
-		b = sp.iloc[1];
-		#print(a.id,b.id)
-		trsppres = trsppresClass(a.age,b.age);
-		mux.loc[a.id,['TRSPPRES']] = trsppres;
-		mux.loc[b.id,['TRSPPRES']] = trsppres;
-		mux.loc[a.id,['TESPEMPNOT']] = 1 if b.emphours > 0 else 2;
-		mux.loc[b.id,['TESPEMPNOT']] = 1 if a.emphours > 0 else 2;
-		mux.loc[a.id,['TESPUHRS']] = b.emphours;
-		mux.loc[b.id,['TESPUHRS']] = a.emphours;
-		mux.loc[a.id,['TUSPUSFT']] = 1 if b.emphours > 35 else 2;
-		mux.loc[b.id,['TUSPUSFT']] = 1 if a.emphours > 35 else 2;
+mux['TRCHILDNUM'] = mergetab['household'].apply(lambda x: hhcounts[x][0]);
+mux['TUELNUM'] = mergetab['household'].apply(lambda x: hhcounts[x][1]);
 
-
-	mux.loc[df.index,['TRCHILDNUM']] = child;
-	mux.loc[df.index,['TUELNUM']] = eld;
-
-#this value has a low low low feature importance because it doesn't say very much
-#mux['TUSPUSFT'] = mux['TESPUHRS'].apply(lambda x: 1 if x > 35 else -1)
+# 	mux.loc[df.index,['TRCHILDNUM']] = child;
+# 	mux.loc[df.index,['TUELNUM']] = eld;
 
 
 #mux['hh'] = mergetab['household']
 
+print(" remaining bits...")
 
 def trdpftptClass(x):
 	if x >= 35 : return 1;
@@ -194,4 +212,3 @@ out['casetype'] = labels;
 print("writing...")
 
 out.to_csv(datapath + "indvlabels.csv")
-

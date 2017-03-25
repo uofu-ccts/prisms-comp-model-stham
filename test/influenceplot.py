@@ -2,12 +2,14 @@ import pandas as pd;
 import numpy as np;
 import matplotlib.pyplot as plt;
 import datetime
+import sys;
 import h5py;
 
 
 datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
 
-infile = h5py.File(datapath + "influence.h5", 'r')
+#infile = h5py.File(datapath + "influence-comp.h5", 'r')
+infile = h5py.File(sys.argv[1],'r')
 xorigin = infile['populations'].attrs['xorigin']
 yorigin = infile['populations'].attrs['yorigin']
 rawmat = infile['populations'][:24,:3,:,:];
@@ -30,8 +32,8 @@ rawmat = np.swapaxes(rawmat,2,3)
 #rawmat = np.clip(rawmat, 0.0,1000.0);
 rawmat = np.log10(rawmat + 1);
 
-xlim = (750,950)
-ylim = (600,1100)
+#xlim = (750,950)
+#ylim = (600,1100)
 
 c = 1;
 s = 12
@@ -43,8 +45,8 @@ for j in range(0,3):
 		ax.set_aspect(1.0)
 		ax.axis('off')
 #		ax.invert_xaxis()
-		ax.set_xlim(xlim);
-		ax.set_ylim(ylim);
+		#ax.set_xlim(xlim);
+		#ax.set_ylim(ylim);
 		ax.pcolormesh(rawmat[i,j],cmap=plt.get_cmap('viridis'))
 		c+= 1
 

@@ -4,6 +4,7 @@ import sqlite3;
 import collections;
 from scipy.stats import exponweib;
 import datetime
+import time;
 import multiprocessing as mp;
 import matplotlib.pyplot as plt;
 import h5py;
@@ -220,18 +221,60 @@ def depchild(frame,tables, day):
 	return adult(frame,tables, day);
 
 
+def rollweibull(act,tab):
+	wb = tab.ix[act]
+	return np.floor(exponweib.rvs(1.0,wb['c'],scale=wb['scale'])) + 1
+
+def pickwork(x):
+	#shiftclasses:
+	#-1 -  no shift
+	#0 - normal: 9 am to 5 pm or thereabouts
+	#1 - evening: 2 pm to midnight
+	#2 - night: 9 pm to 8 am
+	#3 - rotating: could be day, evening, night
+	#4 - split: two daytime shifts, but this is incovenient so irregular
+	#5 - irregular: totally random
+	#6 - other: ill defined, so roll into irregular
+	if(x > 3): return np.random.randint(0,1440);
+	if(x == 3): x = np.random.randint(0,3);
+	a = {0:300, 1:600, 2:1020}
+	return a[x];
+
+def pickschool(x):
+	if(x < 4): return 270;
+	return 210 + (60 * np.random.randint(0,7))
 
 def daypick(frame,tables,day):
 	
+	#0 IS 4PM, 1440 is 
+
 	#actlist += [(t,act,locx,locy)]	
 	actlist = [];
 
 	#determine school/work fixed params
+	workstart = -1
+	if(frame.empshift > -1):
+		workstart = pickwork(frame.empshift);
+		
+	schoolstart = -1
+	if(frame.schoollevel > -1):
+		schoolstart = pickschool(frame.schoollevel);
 	#pick a day type
-	#determine dependent status and school needs
-	#select mandatory and common acts from sched table w/locs
-	#build activity sequence using weibull for variance
+	dayindex = 2 if (day in (1,7)) else 1;
+	cdtable = tables[dayindex][frame.casetype]
+	daytype = np.random.choice(len(cdtable),p=cdtable);
 	
+	#determine dependent status and school needs
+	#TODO: GOING TO SKIP THIS FOR THE MOMENT
+
+	#select mandatory and common acts from sched table w/locs
+	
+
+	#build activity sequence using weibull for variance
+
+
+
+	actlist += [(10101, 1440, frame['addrx'],frame['addry'])]
 	return actlist;
 
 
@@ -287,6 +330,9 @@ def gridsum( frame, grid, tables, day):
 		act = 0;
 		if(f['act'] >= 50000 and f['act'] <= 59999):
 			act = 1;
+		#being at school counts as being at work in this iteration
+		if(f['act'] >= 60000 and f['act'] <= 60299):
+			act = 1;
 		elif(f['act'] >= 180000 and f['act'] <= 189999):
 			act = 2;
 		
@@ -316,20 +362,20 @@ def gridsum( frame, grid, tables, day):
 	return mat, xmin, ymin;
 
 #@profile
-def parallelapplyfunc(table, grid, tables, day):
+def parallelapplyfunc(splittable, grid, tables, day):
 	
-	tpgroup = transprob.groupby(['day','hour']);
+	#tpgroup = transprob.groupby(['day','hour']);
 	
-	if(len(table) > 0):
-		supermat,xmin,ymin = gridsum(table.iloc[0], grid, tables, day);
+	if(len(splittable) > 0):
+		supermat,xmin,ymin = gridsum(splittable.iloc[0], grid, tables, day);
 		tshape = supermat.shape; #(24,3,x,y)
 		supershape = np.array([tshape[2],tshape[3]])
 		superor = np.array([xmin,ymin]);
 		
 		#print('s',superor,supershape)
 		
-		for i in range(1,table.shape[0]):
-			mat, xmin, ymin = gridsum(table.iloc[i], grid, tables, day);
+		for i in range(1,splittable.shape[0]):
+			mat, xmin, ymin = gridsum(splittable.iloc[i], grid, tables, day);
 			tshape = mat.shape; #(24,3,x,y)
 			matshape = np.array([tshape[2],tshape[3]])
 			mator = np.array([xmin,ymin])
@@ -414,38 +460,67 @@ def parallelapplydist(threads, table, grid, tables, day):
 def runit(threads):
 	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
 	
+	limiter = " limit 1000";
+
 	print("loading...")
-	con = sqlite3.connect(datapath + "indvs.sq3");
-	indvs = pd.read_sql("select * from indvs", con);
-	con.close();
+
 	#NEED TO REDUCE MEMORY AND STUFF
+	con = sqlite3.connect(datapath + "indvs2.sq3");
+	indvs = pd.read_sql("select * from indvs" + limiter, con);
 	keys = ['age','gender','householder','group','mobile']
 	for i in keys: indvs[i] = indvs[i].astype('uint8');
-	keys = ['index','id','g1','g2','household']
+	keys = ['id','g1','spouse','g2','household']
 	for i in keys: indvs[i] = indvs[i].astype('uint32');
 	indvs = indvs.drop('addrn',axis=1)
 	indvs = indvs.drop('city',axis=1)
-	indvs.info()
-	
-	con = sqlite3.connect(datapath + "employ.sq3");
-	employ = pd.read_sql("select * from employ", con);
+	#age,g1,g2,gender,household,householder,group,mobile,block,addrx,addry,addrn,city,id,spouse
+	con.close();
+	con = sqlite3.connect(datapath + "employ2.sq3");
+	employ = pd.read_sql("select * from employ" + limiter, con);
+	#id,empblock,empx,empy,empcode,emphours,empweeks,empshift,probemploy
+	keys = ['id','emphours']
+	for i in keys: employ[i] = employ[i].astype('uint32');
+	keys = ['empcode','empweeks','empshift']
+	for i in keys: employ[i] = employ[i].astype('int8');
+	con.close();
+	con = sqlite3.connect(datapath + "school2.sq3");
+	school = pd.read_sql("select * from school" + limiter, con);
+	#id,schoolprob,schoollevel
+	keys = ['schoollevel']
+	for i in keys: school[i] = school[i].astype('int8');
 	con.close();
 	
-	ptable = pd.merge(indvs,employ,on='index')
+	indvlabel = pd.read_csv(datapath + "indvlabels1000.csv",index_col=0)
 	
-	con = sqlite3.connect(datapath + "transprob.sq3");
-	transprob = pd.read_sql("select * from transprob", con);
-	con.close();
 	
-	tpgroup = transprob.groupby(['day','hour']);
+	ptable = pd.merge(indvs,employ,on='id')
+	ptable = pd.merge(ptable,school,on='id')
+	ptable = pd.merge(ptable,indvlabel,on='id')
+	ptable = ptable.drop(['index','index_x','index_y'],axis=1)
+	ptable.info();
+	# con = sqlite3.connect(datapath + "transprob.sq3");
+	# transprob = pd.read_sql("select * from transprob", con);
+	# con.close();
+	
+	#tpgroup = transprob.groupby(['day','hour']);
 	
 	con = sqlite3.connect(datapath + "weibull.sq3");
 	weibull = pd.read_sql("select * from weibull", con);
 	con.close();
 	weibull = weibull.set_index('ID');
 	
-	commontables = (weibull, 
+
+	labtabfile = h5py.File(datapath + "final-label-classifier/labeltab.h5")
+	weekdayarr = labtabfile['/weekday'][:]
+	weekendarr = labtabfile['/weekend'][:]
+	labtabfile.close();
 	
+
+	
+	commontables = (weibull, weekdayarr, weekendarr )
+
+
+
 	print("processing...")
 	print(datetime.datetime.now().time().isoformat());
 	#rawframe = ptable.iloc[1:10000].apply(gridsum, axis=1, args=(500.0,tpgroup, weibull,3,) );
@@ -454,10 +529,10 @@ def runit(threads):
 	print(day)
 
 	#rawmat,x,y = parallelapplyfunc(ptable.iloc[0:10000], 500.0,transprob, weibull,3 )
-	out = h5py.File(datapath + 'Finfluence'+str(day)+'.h5')
+	out = h5py.File(datapath + '/test/Finfluence'+str(day)+time.strftime("-%Y-%m-%d_%H-%M-%S")+'.h5')
 	#for day in range(1,8):
 	rawmat, x, y = parallelapplydist(threads, ptable, 500.0,commontables,day )
-	ds = out.create_dataset('/population'+str(day),data=rawmat,fillvalue=0.,compression='gzip',compression_opts=9)
+	ds = out.create_dataset('/populations',data=rawmat,fillvalue=0.,compression='gzip',compression_opts=9)
 	ds.attrs['xorigin'] = x * 500.0;
 	ds.attrs['yorigin'] = y * 500.0;
 	ds.attrs['day'] = day;
@@ -481,7 +556,8 @@ def runit(threads):
 
 
 if __name__ == '__main__':
-	threads = mkl.get_max_threads();
+	#threads = mkl.get_max_threads();
+	threads = 1;
 	runit(threads)
 
 

@@ -204,8 +204,15 @@ print("classifying...")
 out = pd.DataFrame();
 out['id'] = mergetab['id']
 
-labels = clf.predict(mux[goodcols].values)
-out['casetype'] = labels;
+vals = mux[goodcols].values;
+
+
+labels = [];
+for i in range(0,len(vals),1000):
+	last = i + 1000;
+	if(last > len(vals)): last = len(vals);
+	labels += [clf.predict(vals[i:last])]
+out['casetype'] = np.concatenate(labels);
 
 #print(out);
 

@@ -257,6 +257,8 @@ wti = { tr:i for i,tr in enumerate(locmapping) }
 itw = { i:tr for i,tr in enumerate(locmapping) }
 # print([(i,k) for i,k in enumerate(locmapping)]);
 
+labellist = np.sort(list(set(acttable['daytypelabelreduce'])))
+
 acttable['start'] = acttable['TUCUMDUR24']-acttable['TUACTDUR24']
 acttable['actind'] = acttable['TRCODE'].apply(lambda x: ati[x]);
 acttable['whereind'] = acttable['TEWHERE'].apply(lambda x: wti[x]);
@@ -266,7 +268,7 @@ acttable['whereind'] = acttable['TEWHERE'].apply(lambda x: wti[x]);
 outfile = h5py.File(datapath + "actdata.h5");
 
 outfile.create_dataset("/mapping",data=locmapping,fillvalue=0.,compression='gzip',compression_opts=9)
-
+outfile.create_dataset("/labels",data=labellist,fillvalue=0.,compression='gzip',compression_opts=9)
 
 for i,df in acttable.groupby(['daytypelabelreduce']):
 	print(i,end=' ');

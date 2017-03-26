@@ -72,7 +72,7 @@ def slidewindow(table, maxinstances, interval_size,actmapping,locmapping):
 	startcount = np.zeros((actcount,maxinstances, intervals));
 	# instancecount = np.zeros((actcount,maxinstances));
 
-	table.sort_values(['actind','TUCASEID','TUACTIVITY_N'],inplace=True)
+	table = table.sort_values(['actind','TUCASEID','TUACTIVITY_N'])
 
 	table['instance'] = table.groupby(['actind','TUCASEID']).cumcount();
 

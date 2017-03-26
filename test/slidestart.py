@@ -6,6 +6,7 @@ import matplotlib.patches as mpatch;
 #import scipy.stats.norm as norm;
 from scipy.stats import norm;
 import numpy as np;
+import sys;
 
 import h5py;
 
@@ -271,7 +272,7 @@ outfile.create_dataset("/mapping",data=locmapping,fillvalue=0.,compression='gzip
 outfile.create_dataset("/labels",data=labellist,fillvalue=0.,compression='gzip',compression_opts=9)
 
 for i,df in acttable.groupby(['daytypelabelreduce']):
-	print(i,end=' ');
+	print(i,end=' '); sys.stdout.flush();
 	avginstances,priormat,locations = slidewindow(df,5,5,actmapping,locmapping)
 
 	outfile.create_dataset("/label-"+str(i)+"/avginstances",data=avginstances,fillvalue=0.,compression='gzip',compression_opts=9)

@@ -26,18 +26,24 @@ rawmat = infile['populations'][:24,:3,:,:];
 print(np.max(rawmat))
 #exit()
 
+
+
 #print(rawmat.shape);
 rawmat = np.swapaxes(rawmat,2,3)
 #print(rawmat.shape);
+#rawmat = rawmat / np.max(rawmat)
+
 #rawmat = np.clip(rawmat, 0.0,1000.0);
 rawmat = np.log10(rawmat + 1);
+maxval = np.max(rawmat[0])
+print(maxval)
 
 #xlim = (750,950)
 #ylim = (600,1100)
 
 c = 1;
-s = 12
-e = 23
+s = 4
+e = 4 + 10
 
 for j in range(0,3):
 	for i in range(s,e + 1):
@@ -47,7 +53,8 @@ for j in range(0,3):
 #		ax.invert_xaxis()
 		#ax.set_xlim(xlim);
 		#ax.set_ylim(ylim);
-		ax.pcolormesh(rawmat[i,j],cmap=plt.get_cmap('viridis'))
+		im = ax.pcolormesh(rawmat[i,j],vmin=0,vmax=maxval,cmap=plt.get_cmap('viridis'))
+		#plt.colorbar(im,ax=ax)
 		c+= 1
 
 # ax = plt.subplot(1,3,2)

@@ -3,6 +3,7 @@ import numpy as np;
 import sqlite3;
 import collections;
 from scipy.stats import exponweib;
+from scipy.stats import norm;
 import datetime
 import time;
 import multiprocessing as mp;
@@ -248,8 +249,9 @@ def daypick(frame,tables,day):
 	
 	#0 IS 4PM, 1440 is 
 
-	#actlist += [(t,act,locx,locy)]	
-	actlist = [];
+	weib = tables[0]
+	ati = tables[5];
+	ita = tables[6];
 
 	#determine school/work fixed params
 	workstart = -1
@@ -263,16 +265,81 @@ def daypick(frame,tables,day):
 	dayindex = 2 if (day in (1,7)) else 1;
 	cdtable = tables[dayindex][frame.casetype]
 	daytype = np.random.choice(len(cdtable),p=cdtable);
+	avg = tables[3][daytype][0]
+	prior = tables[3][daytype][1]
+	locs = tables[3][daytype][2]
+	eprior = tables[3][daytype][3]
+
 	
 	#determine dependent status and school needs
 	#TODO: GOING TO SKIP THIS FOR THE MOMENT
 
-	#select mandatory and common acts from sched table w/locs
+	#select activities and instances for this day, w/expected duration and locations
+	actset = collections.Counter();
+	for ind,i in enumerate(avg):
+		act = ita[ind];
+		prob = norm.rvs(loc=i[0],scale=i[1])
+		if prob < 0.: prob = 0.0;
+		pf,pi = np.modf(prob);
+		instances = int(pi + (np.random.rand() < pf))
+		actset[act] = min(instances,5);
+
+
+	df = pd.DataFrame({'act':list(actset.elements())})
+	df['actind'] = df['act'].apply(lambda x: ati[x])
+	df = df[(df['act']//10000) != 18]
+
+
+	df['loc'] = df['act'].apply(lambda x: np.random.choice(len(locs[ati[x]]),p=locs[ati[x]]));
+	df['instance'] = df.groupby(['act']).cumcount();
+
+	#order activities by priority for each instance
+	df['length'] = df['act'].apply(rollweibull,args=(weib,))
+	#df['assign'] = -1;
+
+	df['pick'] = np.random.rand(len(df));
+	df['startguess'] = df.apply(lambda x: np.argmax(prior[x.actind,x.instance] > x.pick)*5,axis=1)
+
+	df = df.sort_values('startguess')
+
+	df['prior'] = df.apply(lambda x: prior[x.actind,x.instance,int(np.floor(x.startguess/5.))],axis=1)
+
+	df = df.sort_values(['startguess','prior'])
+
+	#df['cumlength'] = df['length'].cumsum();
+
+	#reorder activity sequences w/location preferences
+
+	# I: we know sleep most likely happens at the start and end of the day
+	# II: we know that work type activities are likely done in a chunk, so group them
+	# III: we know some events interject other events so it's okay if activities are split
+	# t = 0.0;
+	# for i in range(len(df)):
+	# 	tslot = int(np.floor(t / 5.0));
+	# 	if(tslot >= 288): break;
+	# 	df['prior'] = df.apply(lambda x: prior[x.actind,x.instance,tslot],axis=1)
+	# 	indices = df['assign'] == -1
+	# 	p = df[indices]['prior'].values
+	# 	nextact = np.random.choice(df[indices].index.values, p=p/np.sum(p))
+	# 	df['assign'].at[nextact] = i;
+	# 	thresh = np.random.rand();
+	# 	e = eprior[df.at[nextact,'actind'],df.at[nextact,'instance']]
+	# 	pick = np.argmax(e > thresh)
+	# 	df['end'].at[nextact] = pick*5.0;
+
+	# 	t += df['end'].at[nextact]
+		
 	
 
-	#build activity sequence using weibull for variance
+	if(np.random.rand() < 0.05): print(df)
 
 
+	#finalize activity times 
+
+
+	#build the actlist and apply locations
+	#actlist += [(t,act,locx,locy)]	
+	actlist = [];
 
 	actlist += [(10101, 1440, frame['addrx'],frame['addry'])]
 	return actlist;
@@ -516,8 +583,26 @@ def runit(threads):
 	labtabfile.close();
 	
 
-	
-	commontables = (weibull, weekdayarr, weekendarr )
+	prioritytab = {}
+
+	prior = h5py.File(datapath + "actdata.h5",'r');
+	labels = prior["/labels"][:]
+	actmapping = prior["/actmapping"][:];
+	for i in labels:
+		g = "/label-"+str(i)
+		avg = prior[g+"/avginstances"][:];
+		pri = prior[g+"/priorities"][:];
+		epri = prior[g+"/epriorities"][:];
+		loc = prior[g+"/locations"][:];
+		# for j in range(len(loc)):
+		# 	loc[j] = loc[j] / np.sum(loc[j])
+		prioritytab[i] = (avg,pri,loc,epri);
+	prior.close();
+
+	ati = { tr:i for i,tr in enumerate(actmapping) }
+	ita = { i:tr for i,tr in enumerate(actmapping) }
+
+	commontables = (weibull, weekdayarr, weekendarr, prioritytab, actmapping, ati, ita )
 
 
 
@@ -557,7 +642,7 @@ def runit(threads):
 
 if __name__ == '__main__':
 	#threads = mkl.get_max_threads();
-	threads = 1;
+	threads = 2;
 	runit(threads)
 
 

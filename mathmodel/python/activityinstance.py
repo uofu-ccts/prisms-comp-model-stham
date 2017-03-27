@@ -69,19 +69,24 @@ def slidewindow(table, maxinstances, interval_size,actmapping,locmapping):
 	# plt.show();
 	
 	#calc starttimes cohorts
-	startcount = np.zeros((actcount,maxinstances, intervals));
+	startcount = np.zeros((actcount,maxinstances,intervals));
+	endcount = np.zeros((actcount,maxinstances,intervals));
 	# instancecount = np.zeros((actcount,maxinstances));
 
 	table = table.sort_values(['actind','TUCASEID','TUACTIVITY_N'])
 
 	table['instance'] = table.groupby(['actind','TUCASEID']).cumcount();
 
+
 	#print(table[['actind','TUCASEID','TUACTIVITY_N','instance']].iloc[0:100])
 
 	for i,df in table.iterrows():
 		if(df.instance >= maxinstances): continue;
 		index = np.floor(df.start / interval_size)
+		endindex = np.floor(df.end / interval_size)-1
 		startcount[df.actind,df.instance,index] += 1;
+		endcount[df.actind,df.instance,endindex] += 1;
+
 		# instancecount[df.actind,df.instance] += 1;
 
 	
@@ -89,9 +94,11 @@ def slidewindow(table, maxinstances, interval_size,actmapping,locmapping):
 	for i in range(len(startcount)):
 		for j in range(len(startcount[i])):
 			startcount[i,j] = np.cumsum(startcount[i,j]);
-			# startcount[i,j] /= np.amax(startcount[i,j]);
+			endcount[i,j] = np.cumsum(endcount[i,j]);
+			endcount[i,j] /= np.amax(endcount[i,j]);
+			startcount[i,j] /= np.amax(startcount[i,j]);
 
-
+	
 
 	#get the location information
 	loccount = len(locmapping);
@@ -116,7 +123,7 @@ def slidewindow(table, maxinstances, interval_size,actmapping,locmapping):
 		#startcount[i] = slide2(startcount[i],0.95,casecount);
 		#startcount[i] /= totalcount;
 
-	return avginstances,startcount,locations;
+	return avginstances,startcount,endcount,locations;
 
 def plotslidewindowOLD(mat,mapping,title,path):
 	
@@ -261,6 +268,7 @@ itw = { i:tr for i,tr in enumerate(locmapping) }
 labellist = np.sort(list(set(acttable['daytypelabelreduce'])))
 
 acttable['start'] = acttable['TUCUMDUR24']-acttable['TUACTDUR24']
+acttable['end'] = acttable['TUCUMDUR24']
 acttable['actind'] = acttable['TRCODE'].apply(lambda x: ati[x]);
 acttable['whereind'] = acttable['TEWHERE'].apply(lambda x: wti[x]);
 
@@ -268,15 +276,18 @@ acttable['whereind'] = acttable['TEWHERE'].apply(lambda x: wti[x]);
 
 outfile = h5py.File(datapath + "actdata.h5");
 
-outfile.create_dataset("/mapping",data=locmapping,fillvalue=0.,compression='gzip',compression_opts=9)
+
+outfile.create_dataset("/actmapping",data=actmapping,fillvalue=0.,compression='gzip',compression_opts=9)
+outfile.create_dataset("/locmapping",data=locmapping,fillvalue=0.,compression='gzip',compression_opts=9)
 outfile.create_dataset("/labels",data=labellist,fillvalue=0.,compression='gzip',compression_opts=9)
 
 for i,df in acttable.groupby(['daytypelabelreduce']):
 	print(i,end=' '); sys.stdout.flush();
-	avginstances,priormat,locations = slidewindow(df,5,5,actmapping,locmapping)
+	avginstances,priormat,endmat,locations = slidewindow(df,5,5,actmapping,locmapping)
 
 	outfile.create_dataset("/label-"+str(i)+"/avginstances",data=avginstances,fillvalue=0.,compression='gzip',compression_opts=9)
 	outfile.create_dataset("/label-"+str(i)+"/priorities",data=priormat,fillvalue=0.,compression='gzip',compression_opts=9)
+	outfile.create_dataset("/label-"+str(i)+"/epriorities",data=endmat,fillvalue=0.,compression='gzip',compression_opts=9)
 	outfile.create_dataset("/label-"+str(i)+"/locations",data=locations,fillvalue=0.,compression='gzip',compression_opts=9)
 
 	

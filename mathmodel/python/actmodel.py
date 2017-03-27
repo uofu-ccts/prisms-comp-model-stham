@@ -23,7 +23,7 @@ import sys;
 
 def nonmobile(x):
 	#single activity, 
-	return [ (10101, 1440, x['addrx'],x['addry']) ];
+	return [ (1440,10101, x['addrx'],x['addry']) ];
 
 
 def adult(frame, tpgroup, weibull, day):
@@ -245,15 +245,64 @@ def pickschool(x):
 	if(x < 4): return 270;
 	return 210 + (60 * np.random.randint(0,7))
 
+
+
+
+def locApply(x,fr):
+
+	# print(x,fr)
+	if(fr.empx == 0.0 and fr.empy == 0.0):
+		fr.empx,fr.empy = fr.addrx,fr.addry
+
+	if(x.locp == -1. or x.locp == 1.):
+		return (fr.addrx,fr.addry);
+	elif(x.locp == 2.):
+		return (fr.empx, fr.empy);
+	elif(x.locp == 8.):
+		if fr.schoollevel == 1. : grid = 2000.0
+		elif fr.schoollevel == 4.: grid = 8000.0
+		else: grid = 4000.0;
+		locx = np.round(fr.addrx / grid,0)*grid;
+		locy = np.round(fr.addry / grid,0)*grid;
+		return (locx,locy);
+	else: 
+		if x.prevloc == 2.:
+			locx,locy = fr.empx, fr.empy
+		else:
+			locx,locy = fr.addrx, fr.addry
+		
+		return (locx+norm.rvs(scale=1000.0),locy+norm.rvs(scale=1000.0))
+
+	# 1 Respondent's home or yard KNOWN
+	# 2 Respondent's workplace KNOWN
+	# 3 Someone else's home RANDRAD
+	# 4 Restaurant or bar RANDRAD
+	# 5 Place of worship RANDRAD
+	# 6 Grocery store RANDRAD
+	# 7 Other store/mall RANDRAD
+	# 8 School KNOW
+	# 9 Outdoors away from home RANDRAD
+	# 10 Library RANDRAD
+	# 11 Other place RANDRAD
+	# 30 Bank RANDRAD
+	# 31 Gym/health club RANDRAD
+	# 32 Post Office RANDRAD
+	# 89 Unspecified place RANDRAD
+	# else RANDRAD
+
 def daypick(frame,tables,day):
 	
 	#0 IS 4PM, 1440 is 
 
+	# print(frame)
+
 	weib = tables[0]
 	ati = tables[5];
 	ita = tables[6];
+	itl = tables[7];
 
 	#determine school/work fixed params
+	#????????????????? TODO FIX
 	workstart = -1
 	if(frame.empshift > -1):
 		workstart = pickwork(frame.empshift);
@@ -261,6 +310,7 @@ def daypick(frame,tables,day):
 	schoolstart = -1
 	if(frame.schoollevel > -1):
 		schoolstart = pickschool(frame.schoollevel);
+
 	#pick a day type
 	dayindex = 2 if (day in (1,7)) else 1;
 	cdtable = tables[dayindex][frame.casetype]
@@ -271,6 +321,7 @@ def daypick(frame,tables,day):
 	eprior = tables[3][daytype][3]
 
 	
+
 	#determine dependent status and school needs
 	#TODO: GOING TO SKIP THIS FOR THE MOMENT
 
@@ -288,25 +339,30 @@ def daypick(frame,tables,day):
 	df = pd.DataFrame({'act':list(actset.elements())})
 	df['actind'] = df['act'].apply(lambda x: ati[x])
 	df = df[(df['act']//10000) != 18]
+	if(frame.empshift == -1):
+		df = df[(df['act']//10000) != 5]
 
 
-	df['loc'] = df['act'].apply(lambda x: np.random.choice(len(locs[ati[x]]),p=locs[ati[x]]));
+	df['locp'] = df['act'].apply(lambda x: itl[np.random.choice(len(locs[ati[x]]),p=locs[ati[x]])]);
 	df['instance'] = df.groupby(['act']).cumcount();
 
-	#order activities by priority for each instance
-	df['length'] = df['act'].apply(rollweibull,args=(weib,))
+
 	#df['assign'] = -1;
 
-	df['pick'] = np.random.rand(len(df));
-	df['startguess'] = df.apply(lambda x: np.argmax(prior[x.actind,x.instance] > x.pick)*5,axis=1)
+
+	#order activities by priority for each instance
+	df['pickS'] = norm.cdf(np.random.randn(len(df)));
+	df['startguess'] = df.apply(lambda x: np.argmax(prior[x.actind,x.instance] > x.pickS)*5,axis=1)
 
 	df = df.sort_values('startguess')
 
 	df['prior'] = df.apply(lambda x: prior[x.actind,x.instance,int(np.floor(x.startguess/5.))],axis=1)
 
-	df = df.sort_values(['startguess','prior'])
+	df = df.sort_values(['startguess'])
 
-	#df['cumlength'] = df['length'].cumsum();
+
+	#df['tlength'] = 0;
+	
 
 	#reorder activity sequences w/location preferences
 
@@ -314,10 +370,37 @@ def daypick(frame,tables,day):
 	# II: we know that work type activities are likely done in a chunk, so group them
 	# III: we know some events interject other events so it's okay if activities are split
 	# t = 0.0;
-	# for i in range(len(df)):
-	# 	tslot = int(np.floor(t / 5.0));
-	# 	if(tslot >= 288): break;
-	# 	df['prior'] = df.apply(lambda x: prior[x.actind,x.instance,tslot],axis=1)
+
+	# df['glength'] = np.abs(df['startguess'].diff(-1).fillna(0.));
+	
+	
+	# df['wlength1'] = np.abs(df['act'].apply(rollweibull,args=(weib,))-df['glength'])
+	# df['wlength2'] = np.abs(df['act'].apply(rollweibull,args=(weib,))-df['glength'])
+	# df['wlength3'] = np.abs(df['act'].apply(rollweibull,args=(weib,))-df['glength'])
+	# df['pickL'] = norm.cdf(np.random.randn(len(df)));
+	# df['plength'] = df.apply(lambda x: np.argmax(eprior[x.actind,x.instance] > x.pickL)*5,axis=1)
+	# df['plength'] = np.abs( df['plength'].apply(lambda x: 0 if x > 600 else x) -df['glength'])
+
+	# df['avglength'] = np.floor(( df['wlength1']+df['wlength2']+df['wlength3']+df['plength'] ) /4.0)
+
+	# df['minl'] =  df.apply(lambda x: x.avglength if x.avglength < x.glength else x.glength, axis=1)
+	# df['maxl'] =  df.apply(lambda x: x.avglength if x.avglength > x.glength else x.glength, axis=1)
+	# df['length'] = df.apply(lambda x: np.random.randint(x.minl,x.maxl + 1), axis=1)
+
+
+	
+
+
+
+	df['wlength'] = df['act'].apply(rollweibull,args=(weib,))
+	df['cumlength'] = df['wlength'].cumsum();		
+	df['cumlength'] = np.floor(df['cumlength'] / (df['cumlength'].max() / 1440.0))
+	df['length'] = np.abs(df['cumlength'].diff(1).fillna(df['cumlength']))
+
+	df['prevloc'] = df['locp'].shift(1).fillna(-1)
+
+	df['locx'],df['locy'] = zip(*df.apply(locApply,args=(frame,),axis=1));
+
 	# 	indices = df['assign'] == -1
 	# 	p = df[indices]['prior'].values
 	# 	nextact = np.random.choice(df[indices].index.values, p=p/np.sum(p))
@@ -328,10 +411,12 @@ def daypick(frame,tables,day):
 	# 	df['end'].at[nextact] = pick*5.0;
 
 	# 	t += df['end'].at[nextact]
-		
 	
 
-	if(np.random.rand() < 0.05): print(df)
+	
+
+	#if(np.random.rand() < 0.05): print(df)
+	# print(df)
 
 
 	#finalize activity times 
@@ -339,9 +424,16 @@ def daypick(frame,tables,day):
 
 	#build the actlist and apply locations
 	#actlist += [(t,act,locx,locy)]	
-	actlist = [];
+	#actlist = [];
 
-	actlist += [(10101, 1440, frame['addrx'],frame['addry'])]
+	#actlist += [(10101, 1440, frame['addrx'],frame['addry'])]
+
+	actlist = df[['length','act','locx','locy']].values;
+
+
+
+	#movelist
+
 	return actlist;
 
 
@@ -363,9 +455,14 @@ def superfunc(frame, tables, day):
 #takes the superfunction and gets the horuly grid location activity profile of the user 
 def gridsum( frame, grid, tables, day):
 	
-	superout = pd.DataFrame(superfunc(frame,tables, day));
+
+	superout = pd.DataFrame(superfunc(frame,tables, day))
 
 	superout.columns = ['t','act','locx','locy']
+
+	
+
+
 	#align
 	superout['locx'] = superout['locx'].apply(lambda x: np.round(x / grid, 0) )
 	superout['locy'] = superout['locy'].apply(lambda x: np.round(x / grid, 0) )
@@ -400,25 +497,24 @@ def gridsum( frame, grid, tables, day):
 		#being at school counts as being at work in this iteration
 		if(f['act'] >= 60000 and f['act'] <= 60299):
 			act = 1;
-		elif(f['act'] >= 180000 and f['act'] <= 189999):
-			act = 2;
+		# elif(f['act'] >= 180000 and f['act'] <= 189999):
+		# 	act = 2;
 		
+		for j in range(sind,sind+delta):
+			mat[ j,act,f['locx'],f['locy'] ] += 1
+
 		#act 2 is complicated because we have a range of locations
 		#eg, loc1 -> loc2, all taxicab locations possible
 		#so we have to slice the locations
-		if(act == 2):
+		
 			#don't know where the next location is so assume we stay in grid
-			if (i+1) >= len(superout):
-				nextf = f;
-			else:
-				nextf = superout.iloc[i+1]
-			for j in range(sind,sind+delta):
-				for x in np.arange(f['locx'], nextf['locx'],1.0):
-					for y in np.arange(f['locy'], nextf['locy'],1.0):
-						mat[ j,act,x,y ] += 1
-		else:
-			for j in range(sind,sind+delta):
-				mat[ j,act,f['locx'],f['locy'] ] += 1
+		if (i+1) < len(superout):
+			nextf = superout.iloc[i+1]
+			if(nextf.locx != f.locx and nextf.locy != f.locy):
+				for j in range(sind,sind+delta):
+					for x in np.arange(f['locx'], nextf['locx'],1.0):
+						for y in np.arange(f['locy'], nextf['locy'],1.0):
+							mat[ j,2,x,y ] += 1
 		
 		ct += t
 		if(ct >= 1440):
@@ -588,6 +684,7 @@ def runit(threads):
 	prior = h5py.File(datapath + "actdata.h5",'r');
 	labels = prior["/labels"][:]
 	actmapping = prior["/actmapping"][:];
+	locmapping = prior["/locmapping"][:];
 	for i in labels:
 		g = "/label-"+str(i)
 		avg = prior[g+"/avginstances"][:];
@@ -602,7 +699,9 @@ def runit(threads):
 	ati = { tr:i for i,tr in enumerate(actmapping) }
 	ita = { i:tr for i,tr in enumerate(actmapping) }
 
-	commontables = (weibull, weekdayarr, weekendarr, prioritytab, actmapping, ati, ita )
+	itl = { i:tr for i,tr in enumerate(locmapping) }
+
+	commontables = (weibull, weekdayarr, weekendarr, prioritytab, actmapping, ati, ita,itl )
 
 
 

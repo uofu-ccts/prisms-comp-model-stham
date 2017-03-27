@@ -268,7 +268,7 @@ itw = { i:tr for i,tr in enumerate(locmapping) }
 labellist = np.sort(list(set(acttable['daytypelabelreduce'])))
 
 acttable['start'] = acttable['TUCUMDUR24']-acttable['TUACTDUR24']
-acttable['end'] = acttable['TUCUMDUR24']
+acttable['end'] = acttable['TUACTDUR24']
 acttable['actind'] = acttable['TRCODE'].apply(lambda x: ati[x]);
 acttable['whereind'] = acttable['TEWHERE'].apply(lambda x: wti[x]);
 

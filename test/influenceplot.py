@@ -23,39 +23,61 @@ rawmat = infile['populations'][:24,:3,:,:];
 # #ds.attrs['date']=str(
 # ds.attrs['grid']=500.0
 # outfile.close();
-print(np.max(rawmat))
+# print(np.max(rawmat))
 #exit()
 
+# hist,edge = np.histogram(rawmat,bins=30)
+# print(edge,hist)
+# plt.plot(edge[:-1],hist)
+# plt.show()
+# maxval = np.max(rawmat)*0.5
+maxval = 1500.0
 
+rawmat[:,1,:,:] *= 20;
 
 #print(rawmat.shape);
 rawmat = np.swapaxes(rawmat,2,3)
 #print(rawmat.shape);
 #rawmat = rawmat / np.max(rawmat)
 
-#rawmat = np.clip(rawmat, 0.0,1000.0);
-rawmat = np.log10(rawmat + 1);
-maxval = np.max(rawmat[0])
+rawmat = np.clip(rawmat, 0.0,maxval);
+# rawmat = np.log10(rawmat + 1);
+
 print(maxval)
 
-#xlim = (750,950)
-#ylim = (600,1100)
+
+#wasatch front
+# xlim = (100,600)
+# ylim = (600,1100)
+
+#slc county
+xlim = (315,415)
+ylim = (750,850)
 
 c = 1;
-s = 4
-e = 4 + 10
+s = 0
+e = 23
+st = 4;
+
+plt.subplots_adjust(left=0.02, bottom=0.02, right=0.98, top=0.98, wspace=0.02, hspace=0.02)
 
 for j in range(0,3):
-	for i in range(s,e + 1):
-		ax = plt.subplot(3,e - s + 1,c)
+	for i in range(s,e + 1,st):
+		ax = plt.subplot(3,(e - s + 1)//st,c)
 		ax.set_aspect(1.0)
 		ax.axis('off')
 #		ax.invert_xaxis()
-		#ax.set_xlim(xlim);
-		#ax.set_ylim(ylim);
+		ax.set_xlim(xlim);
+		ax.set_ylim(ylim);
 		im = ax.pcolormesh(rawmat[i,j],vmin=0,vmax=maxval,cmap=plt.get_cmap('viridis'))
 		#plt.colorbar(im,ax=ax)
 		c+= 1
+
+
+F = plt.gcf();
+F.set_size_inches(10,5)
+F.set_dpi(300.0);
+F.savefig(datapath +"influencetraj.png",dpi=300);
 
 # ax = plt.subplot(1,3,2)
 # ax.invert_xaxis()
@@ -69,7 +91,7 @@ for j in range(0,3):
 # ax.set_ylim(ylim);
 # ax.pcolormesh(rawmat[10,2],cmap=plt.get_cmap('viridis'))
 
-plt.show();
+#plt.show();
 
 
 infile.close();

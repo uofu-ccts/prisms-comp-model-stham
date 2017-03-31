@@ -259,7 +259,10 @@ def locApply(x,fr):
 	elif(x.locp == 2.):
 		return (fr.empx, fr.empy);
 	elif(x.locp == 8.):
-		if fr.schoollevel == 1. : grid = 2000.0
+		if fr.schoollevel == 0. : grid = 3500.0
+		if fr.schoollevel == 1. : grid = 1000.0
+		if fr.schoollevel == 2. : grid = 2000.0
+		if fr.schoollevel == 3. : grid = 3000.0
 		elif fr.schoollevel == 4.: grid = 8000.0
 		else: grid = 4000.0;
 		locx = np.round(fr.addrx / grid,0)*grid;
@@ -495,8 +498,9 @@ def gridsum( frame, grid, tables, day):
 		if(f['act'] >= 50000 and f['act'] <= 59999):
 			act = 1;
 		#being at school counts as being at work in this iteration
-		if(f['act'] >= 60000 and f['act'] <= 60299):
-			act = 1;
+		#THIS IS A BAD IDEA
+		# if(f['act'] >= 60000 and f['act'] <= 60299):
+		# 	act = 1;
 		# elif(f['act'] >= 180000 and f['act'] <= 189999):
 		# 	act = 2;
 		
@@ -623,8 +627,8 @@ def parallelapplydist(threads, table, grid, tables, day):
 def runit(threads):
 	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
 	
-	limiter = " limit 1000";
-
+	# limiter = " limit 1000";
+	limiter = ""
 	print("loading...")
 
 	#NEED TO REDUCE MEMORY AND STUFF
@@ -653,7 +657,8 @@ def runit(threads):
 	for i in keys: school[i] = school[i].astype('int8');
 	con.close();
 	
-	indvlabel = pd.read_csv(datapath + "indvlabels1000.csv",index_col=0)
+	#indvlabel = pd.read_csv(datapath + "indvlabels1000.csv",index_col=0)
+	indvlabel = pd.read_csv(datapath + "indvlabels.csv",index_col=0)
 	
 	
 	ptable = pd.merge(indvs,employ,on='id')
@@ -713,7 +718,7 @@ def runit(threads):
 	print(day)
 
 	#rawmat,x,y = parallelapplyfunc(ptable.iloc[0:10000], 500.0,transprob, weibull,3 )
-	out = h5py.File(datapath + '/test/Finfluence'+str(day)+time.strftime("-%Y-%m-%d_%H-%M-%S")+'.h5')
+	out = h5py.File(datapath + '/Finfluence'+str(day)+time.strftime("-%Y-%m-%d_%H-%M-%S")+'.h5')
 	#for day in range(1,8):
 	rawmat, x, y = parallelapplydist(threads, ptable, 500.0,commontables,day )
 	ds = out.create_dataset('/populations',data=rawmat,fillvalue=0.,compression='gzip',compression_opts=9)
@@ -740,8 +745,8 @@ def runit(threads):
 
 
 if __name__ == '__main__':
-	#threads = mkl.get_max_threads();
-	threads = 2;
+	threads = mkl.get_max_threads();
+	# threads = 2;
 	runit(threads)
 
 

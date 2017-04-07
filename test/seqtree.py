@@ -66,50 +66,52 @@ acttable.info()
 frameshift = 3
 
 
-seqs = []
+# seqs = []
 
-print("seq building...")
+# print("seq building...")
 
-c = 0;
-for g,df in acttable.groupby('TUCASEID'):
-	if(c % 100 == 0): 
-		print(c,end=' ')
-		sys.stdout.flush()
+# c = 0;
+# for g,df in acttable.groupby('TUCASEID'):
+# 	if(c % 100 == 0): 
+# 		print(c,end=' ')
+# 		sys.stdout.flush()
 
-	# print(df)
+# 	# print(df)
 
-	df = df.reset_index(drop=True)
-	df = df.reindex(index=np.arange(-frameshift,len(df)+frameshift),fill_value=-1.0).reset_index(drop=True).drop('TUCASEID',axis=1)
+# 	df = df.reset_index(drop=True)
+# 	df = df.reindex(index=np.arange(-frameshift,len(df)+frameshift),fill_value=-1.0).reset_index(drop=True).drop('TUCASEID',axis=1)
 
-	# print(df)
+# 	# print(df)
 
-	shiftframe = pd.DataFrame();
+# 	shiftframe = pd.DataFrame();
 
-	for i in range(0,-frameshift-1,-1):
-		# print(i)
-		reframe = df.shift(i)
-		reframe.columns=['actind-'+str(-i),'start-'+str(-i),'end-'+str(-i),'whereind-'+str(-i)]
-		if(len(shiftframe) == 0): shiftframe = reframe
-		else: shiftframe = pd.concat([shiftframe,reframe],axis=1,join="inner")
+# 	for i in range(0,-frameshift-1,-1):
+# 		# print(i)
+# 		reframe = df.shift(i)
+# 		reframe.columns=['actind-'+str(-i),'start-'+str(-i),'end-'+str(-i),'whereind-'+str(-i)]
+# 		if(len(shiftframe) == 0): shiftframe = reframe
+# 		else: shiftframe = pd.concat([shiftframe,reframe],axis=1,join="inner")
 
-	shiftframe = shiftframe[:-frameshift];
+# 	shiftframe = shiftframe[:-frameshift];
 
-	shiftframe['caseid'] = g;
+# 	shiftframe['caseid'] = g;
 	
-	seqs += [shiftframe]
-	c+=1;
-	# if(c > 2): break;
+# 	seqs += [shiftframe]
+# 	c+=1;
+# 	# if(c > 2): break;
 
-print("concat...")
-combseqs = pd.concat(seqs,axis=0).reset_index(drop=True)
+# print("concat...")
+# combseqs = pd.concat(seqs,axis=0).reset_index(drop=True)
 
-# print(combseqs)
+# # print(combseqs)
+# combseqs.info()
+
+combseqs = pd.read_csv(outpath+"seqtree.csv")
 combseqs.info()
 
 
-
 print("fitting...")
-clf = sklearn.ensemble.ExtraTreesClassifier(n_jobs=1,max_leaf_nodes=None,n_estimators=500,criterion='entropy',min_samples_split=2,min_samples_leaf=1,max_depth=5);
+clf = sklearn.ensemble.ExtraTreesClassifier(n_jobs=1,max_leaf_nodes=None,n_estimators=100,criterion='entropy',min_samples_split=2,min_samples_leaf=1,max_depth=10);
 
 vector = combseqs.ix[:,0:frameshift*4].values
 labels = combseqs.ix[:,frameshift*4:(frameshift+1)*4].values
@@ -120,5 +122,5 @@ labels = combseqs.ix[:,frameshift*4:(frameshift+1)*4].values
 clf = clf.fit(vector,labels);
 
 print("writing...")
-combseqs.to_csv(outpath+"seqtree.csv")
+# combseqs.to_csv(outpath+"seqtree.csv")
 joblib.dump(clf, outpath+"/clfsave-seqtree.pkl", compress=('gzip',9));

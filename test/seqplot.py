@@ -14,8 +14,8 @@ outpath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/test/"
 print("loading...")
 
 acttable = pd.read_csv(datapath + "timeuse/atusact_2015/atusact_2015.dat")
-# infotable = pd.read_csv(datapath + "atusresp_2015/atusresp_2015.dat")
-# acttable = pd.merge(acttable,infotable[['TUCASEID','TUDIARYDAY']],on='TUCASEID')
+infotable = pd.read_csv(datapath + "timeuse/atusresp_2015/atusresp_2015.dat")
+acttable = pd.merge(acttable,infotable[['TUCASEID','TUDIARYDAY']],on='TUCASEID')
 
 labels = pd.read_csv(datapath + "final-label-classifier/labels.csv")
 
@@ -69,18 +69,36 @@ leglabels=["Personal Care","HH activities","HH Member Care","NonHH care","work",
 for i in range(number_of_lines):
 	legart += [mpatch.Rectangle((0,0),1,1,fc=maincolors[i])]
 
+weekdayset = [2,3,4,5,6]
+
 def plotseq(frame):
 	fig, ax = plt.subplots()
 
-	cn = 0;
+	cneg = -1
+	cpos = 1;
+
+
+
+
 	for i,gr in enumerate(frame.groupby("TUCASEID")):
 		g,df = gr;
 		df = df.sort_values(["TUACTIVITY_N"])
 		patches = [];
 
+
+		# day =  int(df['TUDIARYDAY'][0]) - 1;
+		day =  (1 if df['TUDIARYDAY'].iloc[0] in weekdayset else 0);
+
 		x = df['start'].values;
 		y = np.zeros_like(x)
-		y[:] = i
+
+		if(day): 
+			y[:] = cneg
+			cneg -=1
+		else:
+			y[:] = cpos
+			cpos += 1
+
 		c = df['color'].values;
 		w = df['length'].values;
 		h = np.ones_like(w)
@@ -92,13 +110,15 @@ def plotseq(frame):
 
 		ax.add_collection(p)
 
-		cn+=1;
+		# cn+=1;
 		# if(cn > 500): break;
 		
 
 	# fig.legend(legart,leglabels,loc='center left', bbox_to_anchor=(1, 0.5))
+	#print(cn);
+
 	ax.set_xlim((0.,24.))
-	ax.set_ylim((0.,cn))
+	ax.set_ylim((cneg,cpos))
 	plt.show()
 	# plt.show()
 

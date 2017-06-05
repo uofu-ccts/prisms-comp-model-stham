@@ -3,6 +3,7 @@ import time;
 import matplotlib.pyplot as plt;
 import matplotlib.cm as cm
 import matplotlib.patches as mpatch;
+from matplotlib.collections import PatchCollection;
 import numpy as np;
 import sklearn.decomposition
 import sklearn.cluster
@@ -167,6 +168,57 @@ def demoActPlot(frame,labelcolumn, prefix,savemats=False):
 		F.set_dpi(300);
 		F.savefig(prefix +"label-" +str(jg[0]) + ".png");
 		plt.clf();
+
+	# def plotseq(frame):
+		fig, ax = plt.subplots()
+
+		cneg = -1
+		cpos = 1;
+
+		for i,gr in enumerate(jg[1].groupby("TUCASEID")):
+			g,df = gr;
+			df = df.sort_values(["TUACTIVITY_N",])
+			patches = [];
+
+			df['start'] = (df['TUCUMDUR24']-df['TUACTDUR24'])/60.0
+			df['length'] = df['TUACTDUR24']/60.0
+			df['color']= df['TRCODE'].apply(lambda x: colors[tri[int(x)]])
+			day =  (0 if df['TUDIARYDAY'].iloc[0] in weekdayset else 1);
+
+			x = df['start'].values;
+			y = np.zeros_like(x)
+
+			if(day): 
+				y[:] = cneg
+				cneg -=1
+			else:
+				y[:] = cpos
+				cpos += 1
+			
+			c = df['color'].values;
+			w = df['length'].values;
+			h = np.ones_like(w)
+			
+			for xi,yi,wi,hi,ci in zip(x,y,w,h,c):
+				patches.append(mpatch.Rectangle((xi,yi),wi,hi,color=ci,))
+			
+			p = PatchCollection(patches,match_original=True)
+
+			ax.add_collection(p)
+
+			# cn+=1;
+			# if(cn > 500): break;
+			
+
+		# fig.legend(legart,leglabels,loc='center left', bbox_to_anchor=(1, 0.5))
+		ax.set_xlim((0.,24.))
+		ax.set_ylim((cneg,cpos))
+		plt.title( "Label " +str(jg[0]) )
+		F = plt.gcf();
+		F.set_size_inches(12,8)
+		F.set_dpi(300);
+		F.savefig(prefix +"label-" +str(jg[0]) + "-seqs.png");	
+		plt.clf()
 
 	if(savemats): h5out.close();
 
@@ -437,17 +489,22 @@ def main():
 	vectors2 = np.zeros_like(infotable.values);
 
 	for ind,i in enumerate(cases):
-		t = list(set(i[1]['mapped']))
-		vectors[ind][t] += 1;
+		for n,j in i[1].iterrows():
+			# print(j)
+			vectors[ind][j['mapped']] += j['TUACTDUR24'];
 		vectors2[ind] = infotable[infotable['TUCASEID']==i[1]['TUCASEID'].iloc[0]].values;
 
 	supercolumns = [str(b) for b in mapping] + list(infotable.columns) ;
 	superframe = pd.DataFrame(np.concatenate((vectors,vectors2),axis=1),columns=supercolumns);
 	superframe = superframe.set_index(infotable.index);
+
+
+
+
 	#print("Supercolumns: ",supercolumns);
 
 
-	imgpath = outpath + time.strftime("%Y-%m-%d_%H-%M-%S")
+	imgpath = outpath + "classify-" + time.strftime("%Y-%m-%d_%H-%M-%S")
 	os.mkdir(imgpath)
 
 
@@ -458,7 +515,7 @@ def main():
 
 	casetype,firstimport = determineLabels(superframe, goodcols, "casetype", imgpath, cutoff = 35, eps=0.3,samples=10,perplex=30,savefinalclf=True);
 
-	daytype,secondimport = determineLabels(superframe, fullcols, "daytype", imgpath, cutoff = 35,eps=0.2,samples=20,perplex=30);
+	daytype,secondimport = determineLabels(altsuperframe, fullcols, "daytype", imgpath, cutoff = 10,eps=0.2,samples=3,perplex=30);
 
 	# subframe = columnStrip(superframe, goodcols);
 

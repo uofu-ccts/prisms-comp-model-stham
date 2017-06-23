@@ -553,7 +553,8 @@ def main():
 	actcolumns = [str(b) for b in mapping]
 
 	# fullcols = goodcols + ['TUDIARYDAY'] + minlist + actcolumns;
-	fullcols = ['TUDIARYDAY'] + minlist + wherelist + actcolumns;
+	fullcols = ['TUDIARYDAY'] + minlist + actcolumns;
+	#fullcols = ['TUDIARYDAY'] + minlist + wherelist + actcolumns;
 
 	#casetype,firstimport = determineLabels(superframe, goodcols, "casetype", imgpath, cutoff = 35, eps=0.3,samples=10,perplex=30,savefinalclf=True);
 

@@ -34,11 +34,23 @@ def breaks1d(df, ncomp=10):
 
 	return pred,bgm;
 
+
+def assignWindow(x,wins):
+	out = wins[wins['actind']==x['actind']][wins['wmax']>=x['start']][wins['wmin']<=x['start']].index;
+	if(len(out) < 1): return -1;
+	return out[0];
+
+def assignLen(x,lens):
+	out = lens[lens['actind']==x['actind']][lens['lmax']>=x['length']][lens['lmin']<=x['length']] .index;
+	if(len(out) < 1): return -1;
+	return out[0];
+
 def getwindows(df, ncomp=10):
 	ncases = df['instance'].unique().size
 	print(ncases,len(df));
 
 	allwindows = pd.DataFrame();
+	alllengths = pd.DataFrame();
 
 	for i,g in df.groupby(['actind']):
 		if len(g) < 10: continue;
@@ -46,14 +58,12 @@ def getwindows(df, ncomp=10):
 		g['lenwin'],lenbgm = breaks1d(g[["length"]]);
 
 		# windows = pd.DataFrame();
-		lengths = pd.DataFrame();
+		# lengths = pd.DataFrame();
 
 		#print( g.groupby('window').apply(lambda x: x['start'].min()) )
 		#print( g['window'].value_counts() )
 
 		windows = pd.DataFrame(index=g['window'].unique());
-		
-		
 		
 		windows['wincount'] = g['window'].value_counts();
 		windows['winuniq'] =  g.groupby(['window','instance']).size().reset_index().groupby('window').size();
@@ -67,12 +77,33 @@ def getwindows(df, ncomp=10):
 
 		allwindows = allwindows.append(windows);
 
-		#print(windows);
+		# print(g['window'].cov(g['lenwin']) )
+
+		lengths =pd.DataFrame(index=g['lenwin'].unique());
+		lengths['ref'] = lengths.index;
+		lengths['lmin'] = g.groupby('lenwin').apply(lambda x: x['length'].min());
+		lengths['lmax'] = g.groupby('lenwin').apply(lambda x: x['length'].max());
+		lengths['actind'] = i;
+
+
+
+		# print(lengths);
+		alllengths = alllengths.append(lengths);
+
+		#print( g.groupby('window').apply(lambda x: x['window'].cov(x['lenwin'])) )
+		#print(i,g.groupby(['window']).apply(lambda x: x['lenwin'].value_counts() / x['lenwin'].count() ) );
+		#print(i, g.groupby(['instance']).apply(lambda x: tuple(x['window'].sort_values().unique())).value_counts() )
+
+
+		# print(windows);
 	allwindows = allwindows.reset_index();
-	print(allwindows);
+	allwindows = allwindows.drop("index",axis=1);
+	alllengths = alllengths.reset_index();
+	alllengths = alllengths.drop("index",axis=1);
+	print(allwindows,alllengths);
 	# sliceplot(df[['start','length','window']].values);
 
-	return allwindows,lengths;
+	return allwindows,alllengths;
 
 def stenmixture(df, ind,ncomp=5):
 
@@ -612,10 +643,15 @@ for i,df in acttable.groupby(['daytypelabelreduce']):
 	if i not in [1,6,9]: continue;
 	print("calc:",i)
 	# if(len(df) < 10): continue;
-
-	getwindows(df);
+	
+	wins, lens = getwindows(df);
+	print(df.iloc[0:10]);
+	df['wins'] = df[['actind','start']].apply(assignWindow,args=(wins,),axis=1);
+	df['lwins'] = df[['actind','length']].apply(assignLen,args=(lens,),axis=1);
+	print(df.iloc[0:10]);
+	#print(df.iloc[0:10]);
 	# stenmixture(df,i,ncomp=10);
-	# break;
+	break;
 # 	if i not in (1,6,9): continue;
 
 # 	if (c >= 10): break;

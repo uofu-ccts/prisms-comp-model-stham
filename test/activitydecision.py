@@ -29,7 +29,7 @@ def sliceplot(mat):
 def breaks1d(df, ncomp=10):
 	mat = df.values;
 	# print(matX)
-	bgm = BayesianGaussianMixture(n_components=ncomp,covariance_type='full',max_iter=500,n_init=3).fit(mat);
+	bgm = BayesianGaussianMixture(n_components=ncomp,covariance_type='full',max_iter=500,n_init=4).fit(mat);
 	pred = bgm.predict(mat);
 
 	return pred,bgm;
@@ -47,7 +47,7 @@ def assignLen(x,lens):
 
 def getwindows(df, ncomp=10):
 	ncases = df['instance'].unique().size
-	print(ncases,len(df));
+	# print(ncases,len(df));
 
 	allwindows = pd.DataFrame();
 	alllengths = pd.DataFrame();
@@ -100,7 +100,7 @@ def getwindows(df, ncomp=10):
 	allwindows = allwindows.drop("index",axis=1);
 	alllengths = alllengths.reset_index();
 	alllengths = alllengths.drop("index",axis=1);
-	print(allwindows,alllengths);
+	#print(allwindows,alllengths);
 	# sliceplot(df[['start','length','window']].values);
 
 	return allwindows,alllengths;
@@ -523,7 +523,52 @@ def verticalnorm(mat):
 
 	return mat.T
 
+def picklen(x, lens, jprob):
+	# print(x,jprob[x]);
+	win = jprob[x].sample(n=1,weights=jprob[x]).index[0]	
+	return lens.iloc[win][['lmin','lmax']]
 
+
+def buildseqv2(wins,lens,jointprob):
+	#start,end,length, actind
+	st = []; en = []; ac = [];
+
+	winlen = len(wins)
+
+	actlist = wins[np.random.rand(winlen) < wins['prob'].values];
+	# print(actlist);
+	actlist[['lmin','lmax']] = actlist.index.to_series().apply(picklen, args=(lens,jointprob));
+
+	actlist = actlist.sort_values(['wmin','lmax','wmax']);
+
+	print(actlist);
+
+
+	lastst = 0;
+	lastact = 0;
+
+	for m in range(0,1440):
+		pass;
+
+	ac += [lastact]; st += [lastst]; en += [1440]
+	
+	seq = pd.DataFrame({"start":st,"end":en,"actind":ac});
+	seq["length"] = seq["end"] - seq["start"]
+	# print(seq);
+	return seq;
+
+def multiseqv2(wins,lens,jointprob, size=100):
+	df = pd.DataFrame();
+	# propp = verticalnorm(propp);
+	# nextp = verticalnorm(nextp);
+	# endp = verticalnorm(endp);
+
+	for i in range(size):
+		out = buildseqv2(wins,lens,jointprob);
+		out["instance"]=i;
+		df = pd.concat((df, out),axis=0);
+	
+	return df;
 
 def buildseq(propp, nextp, endp):
 	#start,end,length, actind
@@ -640,15 +685,33 @@ randosample = acttable[acttable.TUCASEID.isin(sample)];
 # 	stenmixture(acttable,i,ncomp=15);
 # 'daytypelabelreduce','actind'
 for i,df in acttable.groupby(['daytypelabelreduce']):
-	if i not in [1,6,9]: continue;
+	if i not in [6,]: continue;
 	print("calc:",i)
 	# if(len(df) < 10): continue;
 	
 	wins, lens = getwindows(df);
-	print(df.iloc[0:10]);
+
+	#there's a weird interaction here where the window sorting is actually really important
+	#the activity could be asasigned to more than one start window
+	#but assignment only takes the first window
+	#by sorting with descending start time, we guarantee that we always assign a window
+	#preventing the issue with the joint probability window lacking an 
+	#index for the window
+
+	wins = wins.sort_values(['wmin','prob'],ascending=[False,False]);
+	print(wins,lens)
+	# print(df.lwins.value_counts())
 	df['wins'] = df[['actind','start']].apply(assignWindow,args=(wins,),axis=1);
 	df['lwins'] = df[['actind','length']].apply(assignLen,args=(lens,),axis=1);
-	print(df.iloc[0:10]);
+
+	
+
+	jointprob = df.groupby(['wins']).apply(lambda x: x['lwins'].value_counts() / x['lwins'].count() );
+	print(jointprob);
+	# print( df.groupby('wins').apply(lambda x: x['wins'].cov(x['lwins'])) )
+	#buildseqv2(wins,lens,jointprob);
+	multiseqv2(wins,lens,jointprob,size=5);
+	# print(df.groupby(['instance']).apply(lambda x: tuple(x['wins'].sort_values().unique())).value_counts() )
 	#print(df.iloc[0:10]);
 	# stenmixture(df,i,ncomp=10);
 	break;

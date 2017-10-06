@@ -45,6 +45,12 @@ def assignLen(x,lens):
 	if(len(out) < 1): return -1;
 	return out[0];
 
+def phist(x):
+	a,b = np.histogram(x['length'].values,bins='auto');
+	a = a/np.sum(a)
+	b = b[:-1]
+	return np.array([a,b]);
+
 def getwindows(df, ncomp=10):
 	ncases = df['instance'].unique().size
 	# print(ncases,len(df));
@@ -73,6 +79,9 @@ def getwindows(df, ncomp=10):
 		windows['prob'] = windows['winuniq'] / ncases;
 		windows['wmin'] = g.groupby('window').apply(lambda x: x['start'].min());
 		windows['wmax'] = g.groupby('window').apply(lambda x: x['start'].max());
+		windows['wavg'] = g.groupby('window').apply(lambda x: x['start'].mean());
+		windows['wstd'] = g.groupby('window').apply(lambda x: x['start'].std());
+		windows['wstd'] = windows['wstd'].fillna(1.0);
 		windows['actind'] = i;
 
 		allwindows = allwindows.append(windows);
@@ -83,6 +92,12 @@ def getwindows(df, ncomp=10):
 		lengths['ref'] = lengths.index;
 		lengths['lmin'] = g.groupby('lenwin').apply(lambda x: x['length'].min());
 		lengths['lmax'] = g.groupby('lenwin').apply(lambda x: x['length'].max());
+		lengths['lavg'] = g.groupby('lenwin').apply(lambda x: x['length'].mean());
+		lengths['lstd'] = g.groupby('lenwin').apply(lambda x: x['length'].std());
+		lengths['lhist'] = g.groupby('lenwin').apply(phist);
+
+
+		lengths['lstd'] = lengths['lstd'].fillna(1.0);
 		lengths['actind'] = i;
 
 
@@ -526,10 +541,72 @@ def verticalnorm(mat):
 def picklen(x, lens, jprob):
 	# print(x,jprob[x]);
 	win = jprob[x].sample(n=1,weights=jprob[x]).index[0]	
-	return lens.iloc[win][['lmin','lmax']]
+	return lens.iloc[win][['lmin','lmax','lavg','lstd','lhist']]
 
 
-def buildseqv2(wins,lens,jointprob):
+#defines a matrix for the order of probability windows
+#for non-overlapping windows the activity starts are trivial
+#for overlapping windows, it gives the probability that the activity 
+#is performed before the other window
+#this probability can then be used for a sorting function.
+def gcompare(x):
+	# return 
+
+	return 0.0
+
+def getPrecedeMat(df,wins):
+	
+	wincount = len(wins);
+	precede = np.zeros((wincount,wincount));
+	#g = df.groupby(['instance','win'])
+	#instcount = len(g);
+
+	g = df.groupby(['wins'])
+
+	# print("instcount: ",instcount)
+	for i,iwin in wins.iterrows():
+		for j,jwin in wins.iterrows():
+			if(i==j): continue;
+			#non-overlapping windows
+			if( iwin['wmax'] < jwin['wmin'] ):
+				precede[i,j] = 1.0
+			#overlapping windows
+			else:
+				pcount = 0.0;
+				#mat = g.get_group(i).append(g.get_group(j));
+				mat = pd.merge(g.get_group(i)[['instance','start']],g.get_group(j)[['instance','start']],how='outer',on='instance')
+				# print("MAT", i ,j)
+				# print(mat);
+				count = np.float(len(mat))
+				mat['start_x'].fillna(mat['start_x'].dropna().sample(n=count,replace=True).reset_index(drop=True),inplace=True)
+				mat['start_y'].fillna(mat['start_y'].dropna().sample(n=count,replace=True).reset_index(drop=True),inplace=True)
+				# print(mat)
+				pcount = mat.apply(lambda x: np.float(x.start_x < x.start_y),axis=1).sum()
+
+				precede[i,j] = pcount / count;
+			# print(i,j,precede[i,j],":",end=' ')
+
+
+	return precede;
+
+
+def precsort(actind,precede):
+	actlen = len(actind);
+	
+	pmat = np.random.rand(actlen,actlen);
+	omat = np.zeros((actlen,actlen));
+
+	for i in range(actlen):
+		for j in range(i+1,actlen):
+			result = pmat[i,j] < precede[actind[i],actind[j]]
+			omat[i,j] = (1.0 if result else 0.0)
+			omat[j,i] = (0.0 if result else 1.0)
+	
+	return np.sum(omat, axis=0);
+
+	
+
+def buildseqv2(wins,lens,jointprob,precede):
 	#start,end,length, actind
 	st = []; en = []; ac = [];
 
@@ -537,34 +614,46 @@ def buildseqv2(wins,lens,jointprob):
 
 	actlist = wins[np.random.rand(winlen) < wins['prob'].values];
 	# print(actlist);
-	actlist[['lmin','lmax']] = actlist.index.to_series().apply(picklen, args=(lens,jointprob));
+	actlist[['lmin','lmax','lavg','lstd','lhist']] = actlist.index.to_series().apply(picklen, args=(lens,jointprob));
 
-	actlist = actlist.sort_values(['wmin','lmax','wmax']);
+	#ctlist['length'] = actlist.apply(lambda x: x.lstd * np.random.randn() + x.lavg, axis=1)
+	actlist['length'] = actlist['lhist'].apply(lambda x: np.random.choice(x[1],p=x[0]))
+	actlist['length'] = actlist['length'].apply(lambda x: (1.0 if x < 1.0 else np.floor(x)));
 
-	print(actlist);
+
+	actind = np.array(actlist.index);
+	actlist['precscore'] = precsort(actind,precede)
+	actlist = actlist.sort_values(['precscore','wavg','wmin','length','wmax',]);
 
 
-	lastst = 0;
-	lastact = 0;
 
-	for m in range(0,1440):
-		pass;
+	actlist['lweight'] = actlist['lstd'] / actlist['lstd'].sum();
+	diff = 1440 - actlist['length'].sum() 
 
-	ac += [lastact]; st += [lastst]; en += [1440]
-	
-	seq = pd.DataFrame({"start":st,"end":en,"actind":ac});
-	seq["length"] = seq["end"] - seq["start"]
-	# print(seq);
-	return seq;
+	actlist['length'] += np.floor(actlist['lweight'] * diff)
 
-def multiseqv2(wins,lens,jointprob, size=100):
+
+	actlist['end'] = actlist['length'].cumsum();
+	actlist['start'] = actlist['end'] - actlist['length']
+
+	actlist['validwin'] = actlist.apply(lambda x: 1.0 if x.start <= x.wmax and x.start >= x.wmin else 0.0,axis=1)
+
+	actlist.iloc[-1]['end'] = 1440
+
+	# print(actlist);
+
+	actlist.drop(['wincount','winuniq','density','ref','prob','wmin','wmax','wavg','wstd','lmin','lmax','lavg','lstd','precscore','lweight','validwin'],axis=1,inplace=True)	
+
+	return actlist;
+
+def multiseqv2(wins,lens,jointprob,precede, size=100):
 	df = pd.DataFrame();
 	# propp = verticalnorm(propp);
 	# nextp = verticalnorm(nextp);
 	# endp = verticalnorm(endp);
 
 	for i in range(size):
-		out = buildseqv2(wins,lens,jointprob);
+		out = buildseqv2(wins,lens,jointprob,precede);
 		out["instance"]=i;
 		df = pd.concat((df, out),axis=0);
 	
@@ -674,6 +763,7 @@ acttable['end'] = acttable['TUCUMDUR24']
 acttable['length'] = acttable['TUACTDUR24']
 acttable['actind'] = acttable['TRCODE'].apply(lambda x: ati[x]);
 acttable['instance'] = acttable['TUCASEID']
+acttable['where'] = acttable['TEWHERE']
 
 c = 0;
 samplecount = 400
@@ -685,7 +775,7 @@ randosample = acttable[acttable.TUCASEID.isin(sample)];
 # 	stenmixture(acttable,i,ncomp=15);
 # 'daytypelabelreduce','actind'
 for i,df in acttable.groupby(['daytypelabelreduce']):
-	if i not in [6,]: continue;
+	if i not in [9,]: continue;
 	print("calc:",i)
 	# if(len(df) < 10): continue;
 	
@@ -703,14 +793,20 @@ for i,df in acttable.groupby(['daytypelabelreduce']):
 	# print(df.lwins.value_counts())
 	df['wins'] = df[['actind','start']].apply(assignWindow,args=(wins,),axis=1);
 	df['lwins'] = df[['actind','length']].apply(assignLen,args=(lens,),axis=1);
-
-	
+	df = df.sort_values(['instance','TUACTIVITY_N'])
 
 	jointprob = df.groupby(['wins']).apply(lambda x: x['lwins'].value_counts() / x['lwins'].count() );
 	print(jointprob);
+
+	precede = getPrecedeMat(df,wins);
+	
 	# print( df.groupby('wins').apply(lambda x: x['wins'].cov(x['lwins'])) )
 	#buildseqv2(wins,lens,jointprob);
-	multiseqv2(wins,lens,jointprob,size=5);
+	print("building seq...")
+	seqs = multiseqv2(wins,lens,jointprob,precede,size=200);
+
+	print("plotting...")
+	demoActPlot(seqs,i,actmapping);
 	# print(df.groupby(['instance']).apply(lambda x: tuple(x['wins'].sort_values().unique())).value_counts() )
 	#print(df.iloc[0:10]);
 	# stenmixture(df,i,ncomp=10);

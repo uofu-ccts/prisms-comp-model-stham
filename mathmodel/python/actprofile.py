@@ -19,7 +19,7 @@ from datetime import datetime;
 import re;
 import os;
 
-pd.set_option('display.max_rows', 600)
+pd.set_option('display.max_rows', 2000)
 np.set_printoptions(threshold=np.inf)
 ###############################################
 #   DEFINES
@@ -39,7 +39,7 @@ def featureSort(clf,names):
 	df = pd.DataFrame({'feat':feats,'names':names});
 	df = df.sort_values('feat',ascending=False)
 	return df;
-def demoActPlot(frame,labelcolumn, prefix,savemats=False):
+def demoActPlot(frame,labelcolumn, prefix,savemats=False,cutoff=25):
 
 	if(savemats):
 		h5out = h5py.File(prefix+"mats.h5")
@@ -87,7 +87,7 @@ def demoActPlot(frame,labelcolumn, prefix,savemats=False):
 	#jg is for joingroup
 	for jg in framegroup:
 		
-		if(labelscount[jg[0]] < 25):
+		if(labelscount[jg[0]] < cutoff):
 			continue;
 		
 		daycount = np.zeros(2)
@@ -558,7 +558,7 @@ def main():
 
 	#casetype,firstimport = determineLabels(superframe, goodcols, "casetype", imgpath, cutoff = 35, eps=0.3,samples=10,perplex=30,savefinalclf=True);
 
-	daytype,secondimport = determineLabels(superframe, fullcols, "daytype", imgpath, cutoff = 10,eps=0.1,samples=5,perplex=30);
+	daytype,secondimport = determineLabels(superframe, fullcols, "daytype", imgpath, cutoff = 25,eps=0.1,samples=5,perplex=30);
 
 	# subframe = columnStrip(superframe, goodcols);
 

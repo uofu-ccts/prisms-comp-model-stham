@@ -9,6 +9,7 @@ from scipy.stats import halfnorm, norm, skewnorm;
 from scipy.interpolate import Rbf;
 from sklearn.mixture import BayesianGaussianMixture;
 from sklearn.cluster import SpectralClustering
+#import h5py;
 import numpy as np;
 import sys;
 
@@ -166,7 +167,7 @@ def stenmixture(df, ind,ncomp=5):
 
 	#return out;
 
-def demoActPlot(frame,label,actmapping):
+def demoActPlot(frame,label,actmapping,prefix):
 
 	weekdayset = [2,3,4,5,6]
 	#prelim stuff
@@ -261,12 +262,12 @@ def demoActPlot(frame,label,actmapping):
 
 	plt.legend(legart,leglabels,loc='center left', bbox_to_anchor=(1, 0.5))
 	plt.title( "Label " +str(label) )
-	# F = plt.gcf();
-	# F.set_size_inches(12,8)
-	# F.set_dpi(300);
-	# F.savefig(prefix +"label-" +str(label) + ".png");
-	# plt.clf();
-	plt.show()
+	F = plt.gcf();
+	F.set_size_inches(12,8)
+	F.set_dpi(300);
+	F.savefig(prefix +"label-" +str(label) + ".png");
+	plt.clf();
+	#plt.show()
 
 	fig, ax = plt.subplots()
 
@@ -314,12 +315,12 @@ def demoActPlot(frame,label,actmapping):
 	ax.set_xlim((0.,24.))
 	ax.set_ylim((cneg,cpos))
 	plt.title( "Label " +str(label) )
-	# F = plt.gcf();
-	# F.set_size_inches(12,8)
-	# F.set_dpi(300);
-	# F.savefig(prefix +"label-" +str(jg[0]) + "-seqs.png");	
-	# plt.clf()
-	plt.show()
+	F = plt.gcf();
+	F.set_size_inches(12,8)
+	F.set_dpi(300);
+	F.savefig(prefix +"label-" + str(label) + "-seqs.png");	
+	plt.clf()
+	# plt.show()
 
 	#if(savemats): h5out.close();
 
@@ -577,13 +578,13 @@ def getPrecedeMat(df,wins):
 				mat = pd.merge(g.get_group(i)[['instance','start']],g.get_group(j)[['instance','start']],how='outer',on='instance')
 				# print("MAT", i ,j)
 				# print(mat);
-				count = np.float(len(mat))
+				count = len(mat)
 				mat['start_x'].fillna(mat['start_x'].dropna().sample(n=count,replace=True).reset_index(drop=True),inplace=True)
 				mat['start_y'].fillna(mat['start_y'].dropna().sample(n=count,replace=True).reset_index(drop=True),inplace=True)
 				# print(mat)
 				pcount = mat.apply(lambda x: np.float(x.start_x < x.start_y),axis=1).sum()
 
-				precede[i,j] = pcount / count;
+				precede[i,j] = pcount / np.float(count);
 			# print(i,j,precede[i,j],":",end=' ')
 
 
@@ -734,155 +735,96 @@ def multiseq(propp, nextp, endp, size=100):
 ###############
 #    BEGIN    #
 ###############
+def main():
+	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
 
-datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
+	acttable = pd.read_csv(datapath + "timeuse/atusact_2015/atusact_2015.dat")
 
-acttable = pd.read_csv(datapath + "timeuse/atusact_2015/atusact_2015.dat")
+	labeltab = pd.read_csv(datapath + "newclassify-final/labels.csv")
 
-labeltab = pd.read_csv(datapath + "newclassify-final/labels.csv")
+	acttable = pd.merge(acttable,labeltab,on="TUCASEID");
 
-acttable = pd.merge(acttable,labeltab,on="TUCASEID");
+	acttable = acttable[['TUCASEID','TRCODE','daytypelabelreduce','TEWHERE','TUACTDUR24','TUCUMDUR24','TUACTIVITY_N']]
 
-acttable = acttable[['TUCASEID','TRCODE','daytypelabelreduce','TEWHERE','TUACTDUR24','TUCUMDUR24','TUACTIVITY_N']]
+	actmapping = np.sort(list(set(acttable['TRCODE'])))
+	#actcount = len(mapping)
+	ati = { tr:i for i,tr in enumerate(actmapping) }
+	ita = { i:tr for i,tr in enumerate(actmapping) }
+	print([(i,k) for i,k in enumerate(actmapping)]);
 
-actmapping = np.sort(list(set(acttable['TRCODE'])))
-#actcount = len(mapping)
-ati = { tr:i for i,tr in enumerate(actmapping) }
-ita = { i:tr for i,tr in enumerate(actmapping) }
-print([(i,k) for i,k in enumerate(actmapping)]);
+	locmapping = np.sort(list(set(acttable['TEWHERE'])))
+	wti = { tr:i for i,tr in enumerate(locmapping) }
+	itw = { i:tr for i,tr in enumerate(locmapping) }
+	# print([(i,k) for i,k in enumerate(locmapping)]);
 
-locmapping = np.sort(list(set(acttable['TEWHERE'])))
-wti = { tr:i for i,tr in enumerate(locmapping) }
-itw = { i:tr for i,tr in enumerate(locmapping) }
-# print([(i,k) for i,k in enumerate(locmapping)]);
+	labellist = np.sort(list(set(acttable['daytypelabelreduce'])))
 
-labellist = np.sort(list(set(acttable['daytypelabelreduce'])))
+	acttable['start'] = acttable['TUCUMDUR24']-acttable['TUACTDUR24']
+	acttable['end'] = acttable['TUCUMDUR24']
+	acttable['length'] = acttable['TUACTDUR24']
+	acttable['actind'] = acttable['TRCODE'].apply(lambda x: ati[x]);
+	acttable['instance'] = acttable['TUCASEID']
+	acttable['where'] = acttable['TEWHERE']
 
-acttable['start'] = acttable['TUCUMDUR24']-acttable['TUACTDUR24']
-acttable['end'] = acttable['TUCUMDUR24']
-acttable['length'] = acttable['TUACTDUR24']
-acttable['actind'] = acttable['TRCODE'].apply(lambda x: ati[x]);
-acttable['instance'] = acttable['TUCASEID']
-acttable['where'] = acttable['TEWHERE']
+	c = 0;
+	samplecount = 400
+	sample = np.random.choice(acttable.TUCASEID.unique(),size=samplecount,replace=False)
+	randosample = acttable[acttable.TUCASEID.isin(sample)];
 
-c = 0;
-samplecount = 400
-sample = np.random.choice(acttable.TUCASEID.unique(),size=samplecount,replace=False)
-randosample = acttable[acttable.TUCASEID.isin(sample)];
+	# for i in range(0, len(actmapping)):
+	# 	print("index:",i);
+	# 	stenmixture(acttable,i,ncomp=15);
+	# 'daytypelabelreduce','actind'
 
-# for i in range(0, len(actmapping)):
-# 	print("index:",i);
-# 	stenmixture(acttable,i,ncomp=15);
-# 'daytypelabelreduce','actind'
-for i,df in acttable.groupby(['daytypelabelreduce']):
-	if i not in [9,]: continue;
-	print("calc:",i)
-	# if(len(df) < 10): continue;
-	
-	wins, lens = getwindows(df);
-
-	#there's a weird interaction here where the window sorting is actually really important
-	#the activity could be asasigned to more than one start window
-	#but assignment only takes the first window
-	#by sorting with descending start time, we guarantee that we always assign a window
-	#preventing the issue with the joint probability window lacking an 
-	#index for the window
-
-	wins = wins.sort_values(['wmin','prob'],ascending=[False,False]);
-	print(wins,lens)
-	# print(df.lwins.value_counts())
-	df['wins'] = df[['actind','start']].apply(assignWindow,args=(wins,),axis=1);
-	df['lwins'] = df[['actind','length']].apply(assignLen,args=(lens,),axis=1);
-	df = df.sort_values(['instance','TUACTIVITY_N'])
-
-	jointprob = df.groupby(['wins']).apply(lambda x: x['lwins'].value_counts() / x['lwins'].count() );
-	print(jointprob);
-
-	precede = getPrecedeMat(df,wins);
-	
-	# print( df.groupby('wins').apply(lambda x: x['wins'].cov(x['lwins'])) )
-	#buildseqv2(wins,lens,jointprob);
-	print("building seq...")
-	seqs = multiseqv2(wins,lens,jointprob,precede,size=200);
-
-	print("plotting...")
-	demoActPlot(seqs,i,actmapping);
-	# print(df.groupby(['instance']).apply(lambda x: tuple(x['wins'].sort_values().unique())).value_counts() )
-	#print(df.iloc[0:10]);
-	# stenmixture(df,i,ncomp=10);
-	break;
-# 	if i not in (1,6,9): continue;
-
-# 	if (c >= 10): break;
-# 	print("calc:",i)
+	#h5out = h5py.File(datapath + "actwindows.h5")
 
 
-# 	ind = 189;
+	for i,df in acttable.groupby(['daytypelabelreduce']):
+		# if i not in [6,]: continue;
+		print("calc:",i)
+		# if(len(df) < 10): continue;
+		
+		wins, lens = getwindows(df);
 
-# 	stenmixture(df, ind,ncomp=15);
+		#there's a weird interaction here where the window sorting is actually really important
+		#the activity could be asasigned to more than one start window
+		#but assignment only takes the first window
+		#by sorting with descending start time, we guarantee that we always assign a window
+		#preventing the issue with the joint probability window lacking an 
+		#index for the window
 
-	
-	#actcount,1440
-	# prop = actprop(df,actmapping);
-	# plt.matshow(prop);
-	# plt.show();
+		wins = wins.sort_values(['wmin','prob'],ascending=[False,False]);
+		print(wins,lens)
+		# print(df.lwins.value_counts())
+		df['wins'] = df[['actind','start']].apply(assignWindow,args=(wins,),axis=1);
+		df['lwins'] = df[['actind','length']].apply(assignLen,args=(lens,),axis=1);
+		df = df.sort_values(['instance','TUACTIVITY_N'])
 
-	# limit = df[df['actind'] == ind]
-	# limit["length"] = 5;
-	# demoActPlot(limit,0,actmapping);
+		jointprob = df.groupby(['wins']).apply(lambda x: x['lwins'].value_counts() / x['lwins'].count() );
+		print(jointprob);
 
-	#actcount,1440
-	#nextp = actnext(df,actmapping,sidelen=0.5,limit=0.15);
-	#actcount,1440
-	#comp = actcomplete(df,actmapping,sidelen=0.5,limit=0.15);
-	#actcount,intervals,bins
-	#hist,kernhist = actaccum(df,actmapping,intervals=96,bins=96);
+		precede = getPrecedeMat(df,wins);
 
-
-
-	#print("building seq...")
-	#seq = buildseq(prop, nextp, comp)
-
-	#seqs = multiseq(prop, nextp, comp)
-	#print("plotting...")
-	#demoActPlot(seqs,i,actmapping);
-	#print(seq);
+		wins.to_hdf(datapath + "actwindows.h5","/label-"+str(i)+"/windows",complib='zlib',complevel=9,mode='a');
+		lens.to_hdf(datapath + "actwindows.h5","/label-"+str(i)+"/lengthwin",complib='zlib',complevel=9,mode='a');
+		jointprob.to_hdf(datapath + "actwindows.h5","/label-"+str(i)+"/jointprob",complib='zlib',complevel=9,mode='a');
+		pd.DataFrame(precede).to_hdf(datapath + "actwindows.h5","/label-"+str(i)+"/precede",complib='zlib',complevel=9,mode='a');
 
 
-	# print("scoring");
-	# casemap = np.sort(list(set(df['TUCASEID'])))
-	# casecount = len(casemap)
-	# scores = np.zeros((casecount,));
-	# altscores = np.zeros((samplecount));
+		# h5out.create_dataset("/label-"+str(i)+"/windows",data=wins,compression='gzip',compression_opts=9);
+		# h5out.create_dataset("/label-"+str(i)+"/lengthwin",data=lens,compression='gzip',compression_opts=9);
+		# h5out.create_dataset("/label-"+str(i)+"/jointprob",data=jointprob,compression='gzip',compression_opts=9);
+		# h5out.create_dataset("/label-"+str(i)+"/precede",data=precede,compression='gzip',compression_opts=9);
 
-	# n = 0
-	# for j,dfj in df.groupby(["TUCASEID"]):
-	# 	scores[n] = scorefunc(dfj,prop,kernhist,actmapping);
-	# 	n+=1
+		#print("building seq...")
+		#seqs = multiseqv2(wins,lens,jointprob,precede,size=200);
 
-	# n = 0
-	# for j,dfj in randosample.groupby(["TUCASEID"]):
-	# 	altscores[n] = scorefunc(dfj,prop,kernhist,actmapping);
-	# 	n+=1
+		#print("plotting...")
+		#demoActPlot(seqs,i,actmapping);
+		# break;
+		
+		# c += 1
+	#h5out.close();
 
-	# bins = 100;
-
-	# scorehist = np.histogram(scores,bins=bins,normed=True,range=(0.0,np.amax(scores)))
-
-	# altscorehist = np.histogram(altscores,bins=bins,normed=True,range=(0.0,np.amax(altscores)))
-
-	# print(scorehist,altscorehist);
-
-	# plt.plot(scorehist[1][:-1],scorehist[0]);
-	# plt.plot(altscorehist[1][:-1],altscorehist[0]);
-	# plt.title(str(i))
-	# #106
-	# # plt.matshow(hist[106]);
-	# # plt.title("hist")
-	
-	# # plt.matshow(kernhist[106]);
-	# # plt.title("kernhist")
-	# plt.show();
-	
-	
-	c += 1
+if __name__ == "__main__":
+	main()

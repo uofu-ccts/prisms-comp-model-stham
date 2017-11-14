@@ -16,9 +16,6 @@ import sys;
 
 #wac = pd.read_csv(datapath + "lehd/ut_wac_S000_JT00_2014.csv")
 
-
-
-
 #START CLASSIFICATION FUNCTIONS
 
 def nonmobile(x):

@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt;
 import matplotlib.cm as cm
 import matplotlib.patches as mpatch;
 import numpy as np;
+import sys;
 
 sys.path.append("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/test")
 import bettersankey as bsk;
@@ -49,7 +50,7 @@ print(len(set(trans['dest'])));
 
 s = trans.groupby(['origin','dest']).size()
 
-s.to_csv(datapath + "transitioncounts.csv")
+# s.to_csv(datapath + "transitioncounts.csv")
 
 print("plotting...")
 

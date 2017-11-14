@@ -19,7 +19,7 @@ pd.set_option('display.max_rows', 2000)
 def sliceplot(mat):
 
 	ran = np.max(mat[:,2])
-	print(ran);
+	# print(ran);
 	cm_subsection = np.linspace(0.0,1.0, ran+1)
 	maincolors = [ cm.jet(x) for x in cm_subsection ]
 	for i,color in enumerate(maincolors):
@@ -147,14 +147,14 @@ def stenmixture(df, ind,ncomp=5):
 	matXYZ = np.array([ sti[b] for b in matXYZ ]);
 
 	count =  len(s)
-	print("Count:",count);
+	# print("Count:",count);
 
 	mat = df[["start","length"]].values
 	bgm = BayesianGaussianMixture(n_components=count,covariance_type='full',max_iter=500,n_init=10).fit(mat,matXYZ);
 	matPred = bgm.predict(mat);
 	
 	# print(sti,matXYZ)
-	print("Final:", len(list(set(matPred))))
+	# print("Final:", len(list(set(matPred))))
 
 
 	cm_subsection = np.linspace(0.0,1.0, count)
@@ -740,7 +740,7 @@ def main():
 
 	acttable = pd.read_csv(datapath + "timeuse/atusact_2015/atusact_2015.dat")
 
-	labeltab = pd.read_csv(datapath + "newclassify-final/labels.csv")
+	labeltab = pd.read_csv(datapath + "final-label-classifier/labels.csv")
 
 	acttable = pd.merge(acttable,labeltab,on="TUCASEID");
 
@@ -750,7 +750,7 @@ def main():
 	#actcount = len(mapping)
 	ati = { tr:i for i,tr in enumerate(actmapping) }
 	ita = { i:tr for i,tr in enumerate(actmapping) }
-	print([(i,k) for i,k in enumerate(actmapping)]);
+	# print([(i,k) for i,k in enumerate(actmapping)]);
 
 	locmapping = np.sort(list(set(acttable['TEWHERE'])))
 	wti = { tr:i for i,tr in enumerate(locmapping) }
@@ -794,14 +794,14 @@ def main():
 		#index for the window
 
 		wins = wins.sort_values(['wmin','prob'],ascending=[False,False]);
-		print(wins,lens)
+		# print(wins,lens)
 		# print(df.lwins.value_counts())
 		df['wins'] = df[['actind','start']].apply(assignWindow,args=(wins,),axis=1);
 		df['lwins'] = df[['actind','length']].apply(assignLen,args=(lens,),axis=1);
 		df = df.sort_values(['instance','TUACTIVITY_N'])
 
 		jointprob = df.groupby(['wins']).apply(lambda x: x['lwins'].value_counts() / x['lwins'].count() );
-		print(jointprob);
+		# print(jointprob);
 
 		precede = getPrecedeMat(df,wins);
 

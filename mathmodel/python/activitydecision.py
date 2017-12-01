@@ -641,7 +641,7 @@ def buildseqv2(wins,lens,jointprob,precede,whereprob):
 
 	actlist['locp'] = actlist.index.to_series().apply(lambda x: whereprob[x].sample(n=1,weights=whereprob[x]).index[0]);
 	
-	actlist.iloc[-1]['end'] = 1440.0
+	# actlist.iloc[len(actlist)-1]['end'] = 1439.0
 
 	# print(actlist);
 

@@ -678,10 +678,10 @@ def parallelapplydist(threads, table, grid, tables, day):
 			#reshape the matrix if needed
 			if( np.max(newshape - supershape) > 0 ):
 				#print("reshape")
-				newmat = np.zeros((24,3,newshape[0],newshape[1]), dtype=np.uint32)
+				newmat = np.zeros((24,3,int(newshape[0]),int(newshape[1])), dtype=np.uint32)
 				loc = superor - newor
 				locmax = loc + supershape
-				newmat[:,:,loc[0]:locmax[0],loc[1]:locmax[1]] = supermat
+				newmat[:,:,int(loc[0]):int(locmax[0]),int(loc[1]):int(locmax[1])] = supermat
 				supermat = newmat;
 				supershape = newshape
 				superor = newor
@@ -689,7 +689,7 @@ def parallelapplydist(threads, table, grid, tables, day):
 			#add the new matrix
 			loc = mator - superor
 			locmax = loc + matshape
-			supermat[:,:,loc[0]:locmax[0],loc[1]:locmax[1]] += mat
+			supermat[:,:,int(loc[0]):int(locmax[0]),int(loc[1]):int(locmax[1])] += mat
 			
 		return supermat, superor[0], superor[1],supertraj;	
 	else:
@@ -808,10 +808,13 @@ def runit(threads):
 
 	outproj = pyproj.Proj(init='epsg:4326');
 	inproj = pyproj.Proj(init='epsg:26912');
-	def t(x):
-		x.long,x.lat=pyproj.transform(inproj,outproj,x.long,x.lat);
+	def latlongtrans(x):
+		x.locx,x.locy=pyproj.transform(inproj,outproj,x.locx,x.locy);
 		return x
-	traj[["lat","long"]] = traj[["locx","locy"]].apply(t,axis=1);
+
+	traj[["locx","locy"]] = traj[["locx","locy"]].apply(latlongtrans,axis=1);
+	traj.rename(index=str,columns={"locx":"long","locy":"lat"},inplace=True);
+	# traj.drop(['locx','locy'],axis=1,inplace=True);
 
 	print(datetime.datetime.now().time().isoformat());
 

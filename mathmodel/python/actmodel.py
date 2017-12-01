@@ -8,9 +8,13 @@ import datetime
 import time;
 import multiprocessing as mp;
 import matplotlib.pyplot as plt;
+import pyproj;
 import h5py;
 import mkl;
 import sys;
+
+sys.path.append("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/mathmodel/python");
+import activitydecision as ad;
 
 
 
@@ -18,9 +22,17 @@ import sys;
 
 #START CLASSIFICATION FUNCTIONS
 
-def nonmobile(x):
+def oldnonmobile(x):
 	#single activity, 
 	return [ (1440,10101, x['addrx'],x['addry']) ];
+
+def nonmobile(x):
+
+	out = pd.DataFrame([ (0,1440,10101, x['addrx'],x['addry']) ])
+
+	out.columns = ['start','length','actind','locx','locy']
+
+	return out;
 
 
 def adult(frame, tpgroup, weibull, day):
@@ -245,33 +257,42 @@ def pickschool(x):
 
 
 
-def locApply(x,fr):
+def locApply(x,frame):
 
 	# print(x,fr)
-	if(fr.empx == 0.0 and fr.empy == 0.0):
-		fr.empx,fr.empy = fr.addrx,fr.addry
+	if(frame.empx == 0.0 and frame.empy == 0.0):
+		frame.empx,frame.empy = frame.addrx,frame.addry
 
-	if(x.locp == -1. or x.locp == 1.):
-		return (fr.addrx,fr.addry);
-	elif(x.locp == 2.):
-		return (fr.empx, fr.empy);
-	elif(x.locp == 8.):
-		if fr.schoollevel == 0. : grid = 3500.0
-		if fr.schoollevel == 1. : grid = 1000.0
-		if fr.schoollevel == 2. : grid = 2000.0
-		if fr.schoollevel == 3. : grid = 3000.0
-		elif fr.schoollevel == 4.: grid = 8000.0
+	if(x.locp in [12,13,14,15,16,17,18,19,20,21,99]):
+		_locp = x.prevloc;
+	else: 
+		_locp = x.locp;
+
+
+	if(_locp == -1. or _locp == 1.):
+		return pd.Series([frame.addrx,frame.addry]);
+	elif(_locp == 2.):
+		return pd.Series([frame.empx, frame.empy]);
+	elif(_locp == 8.):
+		if frame.schoollevel == 0. : grid = 3500.0
+		if frame.schoollevel == 1. : grid = 1000.0
+		if frame.schoollevel == 2. : grid = 2000.0
+		if frame.schoollevel == 3. : grid = 3000.0
+		elif frame.schoollevel == 4.: grid = 8000.0
 		else: grid = 4000.0;
-		locx = np.round(fr.addrx / grid,0)*grid;
-		locy = np.round(fr.addry / grid,0)*grid;
-		return (locx,locy);
+		locx = np.round(frame.addrx / grid,0)*grid;
+		locy = np.round(frame.addry / grid,0)*grid;
+		return pd.Series([locx,locy]);
+	
+
+
 	else: 
 		if x.prevloc == 2.:
-			locx,locy = fr.empx, fr.empy
+			locx,locy = frame.empx, frame.empy
 		else:
-			locx,locy = fr.addrx, fr.addry
+			locx,locy = frame.addrx, frame.addry
 		
-		return (locx+norm.rvs(scale=1000.0),locy+norm.rvs(scale=1000.0))
+		return pd.Series([locx+norm.rvs(scale=1000.0),locy+norm.rvs(scale=1000.0)])
 
 	# 1 Respondent's home or yard KNOWN
 	# 2 Respondent's workplace KNOWN
@@ -280,7 +301,7 @@ def locApply(x,fr):
 	# 5 Place of worship RANDRAD
 	# 6 Grocery store RANDRAD
 	# 7 Other store/mall RANDRAD
-	# 8 School KNOW
+	# 8 School KNOWN
 	# 9 Outdoors away from home RANDRAD
 	# 10 Library RANDRAD
 	# 11 Other place RANDRAD
@@ -288,6 +309,19 @@ def locApply(x,fr):
 	# 31 Gym/health club RANDRAD
 	# 32 Post Office RANDRAD
 	# 89 Unspecified place RANDRAD
+	#
+	# 12 Car, truck, or motorcycle (driver) 
+	# 13 Car, truck, or motorcycle (passenger)
+	# 14 Walking 
+	# 15 Bus
+	# 16 Subway/train
+	# 17 Bicycle 
+	# 18 Boat/ferry
+	# 19 Taxi/limousine service 
+	# 20 Airplane 
+	# 21 Other mode of transportation
+	# 99 Unspecified mode of transportation
+	#
 	# else RANDRAD
 
 def daypick(frame,tables,day):
@@ -430,11 +464,44 @@ def daypick(frame,tables,day):
 
 	actlist = df[['length','act','locx','locy']].values;
 
-
+	
 
 	#movelist
 
 	return actlist;
+
+
+
+def manageseq(frame,tables,day):
+
+	ita = tables[6];
+
+	dayindex = 2 if (day in (1,7)) else 1;
+	cdtable = tables[dayindex][int(frame.casetype)]
+	daytype = np.random.choice(len(cdtable),p=cdtable);
+	# wins = tables[3][daytype][0]
+	# lens = tables[3][daytype][1]
+	# jointprob = tables[3][daytype][2]
+	# precede = tables[3][daytype][3]
+	# whereprob = tables[3][daytype][4]
+
+	# fr = ad.buildseqv2(wins,lens,jointprob,precede,whereprob);
+	fr = ad.buildseqv2(tables[3][daytype][0],tables[3][daytype][1],tables[3][daytype][2],tables[3][daytype][3],tables[3][daytype][4]);
+
+	fr['prevloc'] = fr['locp'].shift(1).fillna(-1);
+
+	
+
+	fr[['locx','locy']] = fr.apply(locApply,args=(frame,),axis=1);
+
+	fr['agentnum']=frame.id;
+	
+
+	fr.drop(['locp','prevloc'],axis=1,inplace=True);
+
+	# print(fr);
+
+	return fr;
 
 
 def superfunc(frame, tables, day):
@@ -442,8 +509,10 @@ def superfunc(frame, tables, day):
 	if frame['mobile'] == False:
 		return nonmobile(frame)
 	else:
-		return daypick(frame,tables,day);
+		return manageseq(frame, tables, day);
 		#OLD STUFF
+		# return daypick(frame,tables,day);
+		#OLDER STUFF
 		# if frame['age'] > 18:
 		# 	return adult(frame, tables, day);
 		# else:
@@ -456,74 +525,74 @@ def superfunc(frame, tables, day):
 def gridsum( frame, grid, tables, day):
 	
 
-	superout = pd.DataFrame(superfunc(frame,tables, day))
+	# superout = pd.DataFrame(superfunc(frame,tables, day))
 
-	superout.columns = ['t','act','locx','locy']
+	# superout.columns = ['t','act','locx','locy']
 
-	
+	superout = superfunc(frame,tables,day);
 
+	superout['actcode']=superout['actind'].apply(lambda x: tables[6][x]);
 
 	#align
-	superout['locx'] = superout['locx'].apply(lambda x: np.round(x / grid, 0) )
-	superout['locy'] = superout['locy'].apply(lambda x: np.round(x / grid, 0) )
+	superout['locxg'] = superout['locx'].apply(lambda x: np.round(x / grid, 0) )
+	superout['locyg'] = superout['locy'].apply(lambda x: np.round(x / grid, 0) )
 	
-	ymin = superout['locy'].min()
-	ymax = superout['locy'].max()
-	xmin = superout['locx'].min()
-	xmax = superout['locx'].max()
+	ymin = superout['locyg'].min()
+	ymax = superout['locyg'].max()
+	xmin = superout['locxg'].min()
+	xmax = superout['locxg'].max()
 	
 	#zero
-	superout['locx'] = superout['locx'].apply(lambda x: (x - xmin) )
-	superout['locy'] = superout['locy'].apply(lambda x: (x - ymin) )
+	superout['locxg'] = superout['locxg'].apply(lambda x: (x - xmin) )
+	superout['locyg'] = superout['locyg'].apply(lambda x: (x - ymin) )
+	
 	
 	#print(superout)
 	#print(xmin,xmax,ymin,ymax);
 
-	mat = np.zeros((24,3,(xmax-xmin)+1,(ymax-ymin)+1), dtype=np.uint32)
+	mat = np.zeros((24,3,int(xmax-xmin)+1,int(ymax-ymin)+1), dtype=np.uint32)
 	
-	ct = 0;
-	for i in range(len(superout)):
-		f = superout.iloc[i];
-		t = f['t']
-		
-		sind = int(np.floor(ct/60.0))
-		delta = int(np.floor(t/60.0))
-		if(sind+delta) > 24:
-			delta = 24 - sind;
-		
+
+	for ind,f in superout.iterrows():
+
+		sind = int(np.floor(f['start']/60.0))
+		eind = int(np.floor(f['end']/60.0));
+		 
+
+		fact = f['actcode']
+
 		act = 0;
-		if(f['act'] >= 50000 and f['act'] <= 59999):
+		if(fact >= 50000 and fact <= 59999):
 			act = 1;
 		#being at school counts as being at work in this iteration
 		#THIS IS A BAD IDEA
-		# if(f['act'] >= 60000 and f['act'] <= 60299):
-		# 	act = 1;
-		# elif(f['act'] >= 180000 and f['act'] <= 189999):
-		# 	act = 2;
+		elif(fact >= 60000 and fact <= 60299):
+			act = 1;
+		elif(fact >= 180000 and fact <= 189999):
+			act = 2;
 		
-		for j in range(sind,sind+delta):
-			mat[ j,act,f['locx'],f['locy'] ] += 1
+		for j in range(sind,eind):
+			mat[ j,act,int(f['locxg']),int(f['locyg']) ] += 1
 
 		#act 2 is complicated because we have a range of locations
 		#eg, loc1 -> loc2, all taxicab locations possible
 		#so we have to slice the locations
 		
-			#don't know where the next location is so assume we stay in grid
-		if (i+1) < len(superout):
-			nextf = superout.iloc[i+1]
-			if(nextf.locx != f.locx and nextf.locy != f.locy):
-				for j in range(sind,sind+delta):
-					for x in np.arange(f['locx'], nextf['locx'],1.0):
-						for y in np.arange(f['locy'], nextf['locy'],1.0):
-							mat[ j,2,x,y ] += 1
+		# 	#don't know where the next location is so assume we stay in grid
+		# if (i+1) < len(superout):
+		# 	nextf = superout.iloc[i+1]
+		# 	if(nextf.locx != f.locx and nextf.locy != f.locy):
+		# 		for j in range(sind,sind+delta):
+		# 			for x in np.arange(f['locx'], nextf['locx'],1.0):
+		# 				for y in np.arange(f['locy'], nextf['locy'],1.0):
+		# 					mat[ j,2,x,y ] += 1
 		
-		ct += t
-		if(ct >= 1440):
-			break;	
+		
+	superout.drop(['locxg','locyg','end','actind'],axis=1,inplace=True);
 		
 	
 	
-	return mat, xmin, ymin;
+	return mat, xmin, ymin,superout;
 
 #@profile
 def parallelapplyfunc(splittable, grid, tables, day):
@@ -531,7 +600,8 @@ def parallelapplyfunc(splittable, grid, tables, day):
 	#tpgroup = transprob.groupby(['day','hour']);
 	
 	if(len(splittable) > 0):
-		supermat,xmin,ymin = gridsum(splittable.iloc[0], grid, tables, day);
+		supermat,xmin,ymin,supertraj = gridsum(splittable.iloc[0], grid, tables, day);
+		
 		tshape = supermat.shape; #(24,3,x,y)
 		supershape = np.array([tshape[2],tshape[3]])
 		superor = np.array([xmin,ymin]);
@@ -539,31 +609,34 @@ def parallelapplyfunc(splittable, grid, tables, day):
 		#print('s',superor,supershape)
 		
 		for i in range(1,splittable.shape[0]):
-			mat, xmin, ymin = gridsum(splittable.iloc[i], grid, tables, day);
+			mat, xmin, ymin,traj = gridsum(splittable.iloc[i], grid, tables, day);
+			supertraj = pd.concat([supertraj,traj],ignore_index=True)
+
 			tshape = mat.shape; #(24,3,x,y)
 			matshape = np.array([tshape[2],tshape[3]])
 			mator = np.array([xmin,ymin])
 			newor = np.minimum(superor,mator);
 			newmax = np.maximum(superor+supershape,mator+matshape)
 			newshape = newmax-newor;
+			newshape = newshape
 			#reshape the matrix if needed
 			#print('s',superor,supershape+superor, 'm', mator,matshape+mator, 'n',newor,newshape+newor)
 			if( np.max(newshape - supershape) > 0 ):
 				#print("reshape")
-				newmat = np.zeros((24,3,newshape[0],newshape[1]), dtype=np.uint32)
+				newmat = np.zeros((24,3,int(newshape[0]),int(newshape[1])), dtype=np.uint32)
 				loc = superor - newor
 				locmax = loc + supershape
-				newmat[:,:,loc[0]:locmax[0],loc[1]:locmax[1]] = supermat
+				newmat[:,:,int(loc[0]):int(locmax[0]),int(loc[1]):int(locmax[1])] = supermat
 				supermat = newmat;
 				supershape = newshape
 				superor = newor
 			#add the new matrix
 			loc = mator - superor
 			locmax = loc + matshape
-			supermat[:,:,loc[0]:locmax[0],loc[1]:locmax[1]] += mat
+			supermat[:,:,int(loc[0]):int(locmax[0]),int(loc[1]):int(locmax[1])] += mat
 			
 			
-		return supermat, superor[0], superor[1];	
+		return supermat, superor[0], superor[1],supertraj;	
 
 def parallelapplydist(threads, table, grid, tables, day):
 	#split table
@@ -585,7 +658,7 @@ def parallelapplydist(threads, table, grid, tables, day):
 	out = p.starmap(parallelapplyfunc,splittable);
 	
 	if(len(out) > 0):
-		supermat,xmin,ymin = out[0]
+		supermat,xmin,ymin,supertraj = out[0]
 		tshape = supermat.shape; #(24,3,x,y)
 		
 		supershape = np.array([tshape[2],tshape[3]])
@@ -593,7 +666,9 @@ def parallelapplydist(threads, table, grid, tables, day):
 		superor = np.array([xmin,ymin]);
 		
 		for i in range(1,len(out)):
-			mat, xmin, ymin = out[i]
+			mat, xmin, ymin,traj = out[i]
+			supertraj = pd.concat([supertraj,traj],ignore_index=True)
+
 			tshape = mat.shape; #(24,3,x,y)
 			matshape = np.array([tshape[2],tshape[3]])
 			mator = np.array([xmin,ymin])
@@ -616,7 +691,7 @@ def parallelapplydist(threads, table, grid, tables, day):
 			locmax = loc + matshape
 			supermat[:,:,loc[0]:locmax[0],loc[1]:locmax[1]] += mat
 			
-		return supermat, superor[0], superor[1];	
+		return supermat, superor[0], superor[1],supertraj;	
 	else:
 		return None;
 	
@@ -624,8 +699,8 @@ def parallelapplydist(threads, table, grid, tables, day):
 def runit(threads):
 	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
 	
-	# limiter = " limit 1000";
-	limiter = ""
+	limiter = " limit 1000";
+	#limiter = ""
 	print("loading...")
 
 	#NEED TO REDUCE MEMORY AND STUFF
@@ -683,52 +758,77 @@ def runit(threads):
 
 	prioritytab = {}
 
-	prior = h5py.File(datapath + "actdata.h5",'r');
+	prior = h5py.File(datapath + "actwindows.h5",'r');
 	labels = prior["/labels"][:]
 	actmapping = prior["/actmapping"][:];
 	locmapping = prior["/locmapping"][:];
+	prior.close();
+
 	for i in labels:
 		g = "/label-"+str(i)
-		avg = prior[g+"/avginstances"][:];
-		pri = prior[g+"/priorities"][:];
-		epri = prior[g+"/epriorities"][:];
-		loc = prior[g+"/locations"][:];
+		wins = pd.read_hdf(datapath + "actwindows.h5",key=g+"/windows");
+		lens = pd.read_hdf(datapath + "actwindows.h5",key=g+"/lengthwin");
+		jointprob = pd.read_hdf(datapath + "actwindows.h5",key=g+"/jointprob");
+		precede = pd.read_hdf(datapath + "actwindows.h5",key=g+"/precede").values;
+		whereprob = pd.read_hdf(datapath + "actwindows.h5",key=g+"/whereprob");
+		# avg = prior[g+"/avginstances"][:];
+		# pri = prior[g+"/priorities"][:];
+		# epri = prior[g+"/epriorities"][:];
+		# loc = prior[g+"/locations"][:];
 		# for j in range(len(loc)):
 		# 	loc[j] = loc[j] / np.sum(loc[j])
-		prioritytab[i] = (avg,pri,loc,epri);
-	prior.close();
+		prioritytab[i] = (wins,lens,jointprob,precede,whereprob);
+	# prior.close();
 
 	ati = { tr:i for i,tr in enumerate(actmapping) }
 	ita = { i:tr for i,tr in enumerate(actmapping) }
 
 	itl = { i:tr for i,tr in enumerate(locmapping) }
 
-	commontables = (weibull, weekdayarr, weekendarr, prioritytab, actmapping, ati, ita,itl )
+	commontables = (weibull, weekdayarr, weekendarr, prioritytab, actmapping, ati, ita,  itl )
 
 
 
 	print("processing...")
+
+	ttt = time.strftime("-%Y-%m-%d_%H-%M-%S")
+
 	print(datetime.datetime.now().time().isoformat());
 	#rawframe = ptable.iloc[1:10000].apply(gridsum, axis=1, args=(500.0,tpgroup, weibull,3,) );
 	
 	day = int(sys.argv[1])
 	print(day)
 
-	#rawmat,x,y = parallelapplyfunc(ptable.iloc[0:10000], 500.0,transprob, weibull,3 )
-	out = h5py.File(datapath + '/Finfluence'+str(day)+time.strftime("-%Y-%m-%d_%H-%M-%S")+'.h5')
+	# rawmat,x,y,traj = parallelapplyfunc(ptable.iloc[0:1000], 500.0,commontables, day )
+
 	#for day in range(1,8):
-	rawmat, x, y = parallelapplydist(threads, ptable, 500.0,commontables,day )
+	rawmat, x, y,traj = parallelapplydist(threads, ptable, 500.0,commontables,day )
+	traj['day'] = day;
+	traj['day365']=1;
+
+	outproj = pyproj.Proj(init='epsg:4326');
+	inproj = pyproj.Proj(init='epsg:26912');
+	def t(x):
+		x.long,x.lat=pyproj.transform(inproj,outproj,x.long,x.lat);
+		return x
+	traj[["lat","long"]] = traj[["locx","locy"]].apply(t,axis=1);
+
+	print(datetime.datetime.now().time().isoformat());
+
+	out = h5py.File(datapath + '/Finfluence'+str(day)+ ttt +'.h5')
 	ds = out.create_dataset('/populations',data=rawmat,fillvalue=0.,compression='gzip',compression_opts=9)
 	ds.attrs['xorigin'] = x * 500.0;
 	ds.attrs['yorigin'] = y * 500.0;
 	ds.attrs['day'] = day;
 	ds.attrs['date']=datetime.datetime.now().isoformat() #place holder
 	ds.attrs['grid']=500.0
-		
 	out.close();
 	
+	con = sqlite3.connect(datapath + '/Ftraj'+str(day)+ttt+'.sqlite3');
+	traj.to_sql('acttraj',con);
+	con.close();
 	
-	print(datetime.datetime.now().time().isoformat());
+	
 	print(x,y);
 	print(rawmat.shape);
 	exit();

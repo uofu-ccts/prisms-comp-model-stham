@@ -4,3 +4,4 @@
 /lib
 *__pycache__*
 /tags
+/transfer

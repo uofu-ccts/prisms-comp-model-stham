@@ -9,12 +9,12 @@ from scipy.stats import halfnorm, norm, skewnorm;
 from scipy.interpolate import Rbf;
 from sklearn.mixture import BayesianGaussianMixture;
 from sklearn.cluster import SpectralClustering
-#import h5py;
+import h5py;
 import numpy as np;
 import sys;
 
 pd.set_option('display.max_rows', 2000)
-
+pd.options.mode.chained_assignment = None
 
 def sliceplot(mat):
 
@@ -545,6 +545,7 @@ def picklen(x, lens, jprob):
 	return lens.iloc[win][['lmin','lmax','lavg','lstd','lhist']]
 
 
+
 #defines a matrix for the order of probability windows
 #for non-overlapping windows the activity starts are trivial
 #for overlapping windows, it gives the probability that the activity 
@@ -607,9 +608,8 @@ def precsort(actind,precede):
 
 	
 
-def buildseqv2(wins,lens,jointprob,precede):
+def buildseqv2(wins,lens,jointprob,precede,whereprob):
 	#start,end,length, actind
-	st = []; en = []; ac = [];
 
 	winlen = len(wins)
 
@@ -639,22 +639,24 @@ def buildseqv2(wins,lens,jointprob,precede):
 
 	actlist['validwin'] = actlist.apply(lambda x: 1.0 if x.start <= x.wmax and x.start >= x.wmin else 0.0,axis=1)
 
-	actlist.iloc[-1]['end'] = 1440
+	actlist['locp'] = actlist.index.to_series().apply(lambda x: whereprob[x].sample(n=1,weights=whereprob[x]).index[0]);
+	
+	actlist.iloc[-1]['end'] = 1440.0
 
 	# print(actlist);
 
-	actlist.drop(['wincount','winuniq','density','ref','prob','wmin','wmax','wavg','wstd','lmin','lmax','lavg','lstd','precscore','lweight','validwin'],axis=1,inplace=True)	
+	actlist.drop(['wincount','winuniq','density','ref','prob','wmin','wmax','wavg','wstd','lmin','lmax','lavg','lstd','precscore','lweight','validwin','lhist'],axis=1,inplace=True)	
 
 	return actlist;
 
-def multiseqv2(wins,lens,jointprob,precede, size=100):
+def multiseqv2(wins,lens,jointprob,precede,whereprob, size=100):
 	df = pd.DataFrame();
 	# propp = verticalnorm(propp);
 	# nextp = verticalnorm(nextp);
 	# endp = verticalnorm(endp);
 
 	for i in range(size):
-		out = buildseqv2(wins,lens,jointprob,precede);
+		out = buildseqv2(wins,lens,jointprob,precede,whereprob);
 		out["instance"]=i;
 		df = pd.concat((df, out),axis=0);
 	
@@ -758,13 +760,19 @@ def main():
 	# print([(i,k) for i,k in enumerate(locmapping)]);
 
 	labellist = np.sort(list(set(acttable['daytypelabelreduce'])))
+	
+	outfile = h5py.File(datapath + "actwindows.h5");
+	outfile.create_dataset("/actmapping",data=actmapping,fillvalue=0.,compression='gzip',compression_opts=9)
+	outfile.create_dataset("/locmapping",data=locmapping,fillvalue=0.,compression='gzip',compression_opts=9)
+	outfile.create_dataset("/labels",data=labellist,fillvalue=0.,compression='gzip',compression_opts=9)
+	outfile.close();
 
 	acttable['start'] = acttable['TUCUMDUR24']-acttable['TUACTDUR24']
 	acttable['end'] = acttable['TUCUMDUR24']
 	acttable['length'] = acttable['TUACTDUR24']
 	acttable['actind'] = acttable['TRCODE'].apply(lambda x: ati[x]);
 	acttable['instance'] = acttable['TUCASEID']
-	acttable['where'] = acttable['TEWHERE']
+	acttable['where'] = acttable['TEWHERE'];
 
 	c = 0;
 	samplecount = 400
@@ -803,11 +811,14 @@ def main():
 		jointprob = df.groupby(['wins']).apply(lambda x: x['lwins'].value_counts() / x['lwins'].count() );
 		# print(jointprob);
 
+		whereprob = df.groupby(['wins']).apply(lambda x: x['where'].value_counts() / x['where'].count() );
+
 		precede = getPrecedeMat(df,wins);
 
 		wins.to_hdf(datapath + "actwindows.h5","/label-"+str(i)+"/windows",complib='zlib',complevel=9,mode='a');
 		lens.to_hdf(datapath + "actwindows.h5","/label-"+str(i)+"/lengthwin",complib='zlib',complevel=9,mode='a');
 		jointprob.to_hdf(datapath + "actwindows.h5","/label-"+str(i)+"/jointprob",complib='zlib',complevel=9,mode='a');
+		whereprob.to_hdf(datapath + "actwindows.h5","/label-"+str(i)+"/whereprob",complib='zlib',complevel=9,mode='a');
 		pd.DataFrame(precede).to_hdf(datapath + "actwindows.h5","/label-"+str(i)+"/precede",complib='zlib',complevel=9,mode='a');
 
 

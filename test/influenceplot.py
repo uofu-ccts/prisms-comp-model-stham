@@ -47,12 +47,12 @@ print(maxval)
 
 
 #wasatch front
-# xlim = (100,600)
-# ylim = (600,1100)
+xlim = (100,600)
+ylim = (600,1100)
 
 #slc county
-xlim = (315,415)
-ylim = (750,850)
+# xlim = (315,415)
+# ylim = (750,850)
 
 c = 1;
 s = 0
@@ -77,7 +77,7 @@ for j in range(0,3):
 F = plt.gcf();
 F.set_size_inches(10,5)
 F.set_dpi(300.0);
-F.savefig(datapath +"influencetraj.png",dpi=300);
+F.savefig(datapath +str(sys.argv[1])+"-plot.png",dpi=300);
 
 # ax = plt.subplot(1,3,2)
 # ax.invert_xaxis()

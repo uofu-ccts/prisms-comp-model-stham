@@ -24,13 +24,13 @@ import activitydecision as ad;
 
 def oldnonmobile(x):
 	#single activity, 
-	return [ (1440,10101, x['addrx'],x['addry']) ];
+	return [ (1440,0, x['addrx'],x['addry']) ];
 
 def nonmobile(x):
 
-	out = pd.DataFrame([ (0,1440,10101, x['addrx'],x['addry']) ])
+	out = pd.DataFrame([ (0,1439,1439,0, x['addrx'],x['addry'],x['id']) ])
 
-	out.columns = ['start','length','actind','locx','locy']
+	out.columns = ['start','length','end','actind','locx','locy','agentnum']
 
 	return out;
 
@@ -474,7 +474,7 @@ def daypick(frame,tables,day):
 
 def manageseq(frame,tables,day):
 
-	ita = tables[6];
+	# ita = tables[6];
 
 	dayindex = 2 if (day in (1,7)) else 1;
 	cdtable = tables[dayindex][int(frame.casetype)]
@@ -556,7 +556,7 @@ def gridsum( frame, grid, tables, day):
 	for ind,f in superout.iterrows():
 
 		sind = int(np.floor(f['start']/60.0))
-		eind = int(np.floor(f['end']/60.0));
+		eind = min(24,int(np.floor(f['end']/60.0)));
 		 
 
 		fact = f['actcode']
@@ -699,8 +699,8 @@ def parallelapplydist(threads, table, grid, tables, day):
 def runit(threads):
 	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
 	
-	limiter = " limit 1000";
-	#limiter = ""
+	# limiter = " limit 1000";
+	limiter = ""
 	print("loading...")
 
 	#NEED TO REDUCE MEMORY AND STUFF

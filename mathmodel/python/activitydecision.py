@@ -618,7 +618,7 @@ def buildseqv2(wins,lens,jointprob,precede,whereprob):
 	actlist[['lmin','lmax','lavg','lstd','lhist']] = actlist.index.to_series().apply(picklen, args=(lens,jointprob));
 
 	#ctlist['length'] = actlist.apply(lambda x: x.lstd * np.random.randn() + x.lavg, axis=1)
-	actlist['length'] = actlist['lhist'].apply(lambda x: np.random.choice(x[1],p=x[0]))
+	actlist['length'] = actlist['lhist'].apply(lambda x: np.random.choice(x[1],p=x[0])).fillna(1.0);
 	actlist['length'] = actlist['length'].apply(lambda x: (1.0 if x < 1.0 else np.floor(x)));
 
 
@@ -631,7 +631,7 @@ def buildseqv2(wins,lens,jointprob,precede,whereprob):
 	actlist['lweight'] = actlist['lstd'] / actlist['lstd'].sum();
 	diff = 1440 - actlist['length'].sum() 
 
-	actlist['length'] += np.floor(actlist['lweight'] * diff)
+	actlist['length'] += np.floor(actlist['lweight'] * diff).fillna(1.0);
 
 
 	actlist['end'] = actlist['length'].cumsum();
@@ -639,7 +639,7 @@ def buildseqv2(wins,lens,jointprob,precede,whereprob):
 
 	actlist['validwin'] = actlist.apply(lambda x: 1.0 if x.start <= x.wmax and x.start >= x.wmin else 0.0,axis=1)
 
-	actlist['locp'] = actlist.index.to_series().apply(lambda x: whereprob[x].sample(n=1,weights=whereprob[x]).index[0]);
+	actlist['locp'] = actlist.index.to_series().apply(lambda x: whereprob[x].sample(n=1,weights=whereprob[x]).index[0]).fillna(-1);
 	
 	# actlist.iloc[len(actlist)-1]['end'] = 1439.0
 

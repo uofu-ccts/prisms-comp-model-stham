@@ -12,6 +12,10 @@ import pyproj;
 import h5py;
 import mkl;
 import sys;
+import pycurl;
+from io import BytesIO;
+import json;
+import resource;
 
 sys.path.append("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/mathmodel/python");
 import activitydecision as ad;
@@ -471,6 +475,110 @@ def daypick(frame,tables,day):
 	return actlist;
 
 
+outproj = pyproj.Proj(init='epsg:4326');
+inproj = pyproj.Proj(init='epsg:26912');
+def latlongtrans(x):
+	x.locx,x.locy=pyproj.transform(inproj,outproj,x.locx,x.locy);
+	return x
+
+def reversetrans(x):
+	x.locx,x.locy=pyproj.transform(outproj,inproj,x.locx,x.locy);
+	return x
+
+def latlongtransraw(locx,locy):
+	locx,locy=pyproj.transform(inproj,outproj,locx,locy);
+	return locx,locy
+
+def reversetransraw(locx,locy):
+	locx,locy=pyproj.transform(outproj,inproj,locx,locy);
+	return locx,locy
+
+
+def gettrip(lonx1,laty1,lonx2,laty2):
+	curlobj = pycurl.Curl()
+	data = BytesIO()
+	baseurl = "http://0.0.0.0:30606/route/v1/driving/"
+	baseopts= "?alternatives=3&overview=full&geometries=geojson&annotations=duration"
+
+	#curlobj.setopt(curlobj.URL, "http://0.0.0.0:30606/route/v1/driving/-111.850805,40.767031;-111.8808,40.777031?alternatives=5")
+	curlobj.setopt(curlobj.URL, baseurl +str(lonx1)+","+str(laty1)+";"+str(lonx2)+","+str(laty2)+baseopts);
+	curlobj.setopt(curlobj.WRITEFUNCTION, data.write)
+	curlobj.perform()
+	# print(data.getvalue());
+	dc = json.loads(data.getvalue())
+	# print(dc);
+	rcount = len(dc['routes']);
+	pick = np.random.randint(0,rcount);
+	# print(len(dc['routes'][pick]['geometry']['coordinates']), len(dc['routes'][pick]['legs'][0]['annotation']['distance']))
+	line = np.array(dc['routes'][pick]['geometry']['coordinates']).T
+	duration = np.array(dc['routes'][pick]['legs'][0]['annotation']['duration'] + [0.0])
+	dur = np.sum(duration)
+	
+	df = pd.DataFrame({"locx":line[0],"locy":line[1],"length":duration});
+	df['length'] = (df['length']/60.0)
+
+	df[['locx','locy']] = df[['locx','locy']].apply(reversetrans, axis=1);
+
+	return df,dur;
+
+
+def mangletrips(fr,frame):
+
+	
+	#trips = fr['locp'].isin([12,13,14,15,16,17,18,19,20,21,99]).index;
+	trips = fr[fr['actind'] < 382][fr['actind'] > 313].index
+	fintr = pd.DataFrame();
+
+	for ind in trips:
+		ploc = fr.index.get_loc(ind)-1
+		if ploc < 0:
+			locpx, locpy = frame.addrx, frame.addry;
+		else:
+			locpx, locpy = fr.iloc[ploc][['locx','locy']]
+
+		nloc = fr.index.get_loc(ind)+1
+		if nloc >= len(fr):
+			locnx, locny = frame.addrx, frame.addry;
+		else:
+			locnx, locny = fr.iloc[nloc][['locx','locy']]
+
+		if (locpx == locnx) and (locpy == locny):
+			continue;
+
+		fr.loc[ind]['locx'] = locpx;
+		fr.loc[ind]['locy'] = locpy;
+		act = fr.loc[ind]['actind']
+		low = fr.loc[ind]['start']
+		high = fr.loc[ind]['end']
+		pr = fr.loc[ind]['prevloc']
+		loc = fr.loc[ind]['locp']
+
+		locpx,locpy = latlongtransraw(locpx,locpy);
+		locnx,locny = latlongtransraw(locnx,locny);
+
+		trdf,dur = gettrip(locpx,locpy,locnx,locny);
+
+		trdf['actind']=act;
+		trdf['start']=trdf['length'].cumsum()+low;
+		trdf['end']=trdf['start']+trdf['length']
+		trdf['start']=trdf['start'].apply(lambda x: 1440.0 if x > 1440.0 else x)
+		trdf['end']=trdf['end'].apply(lambda x: 1440.0 if x > 1440.0 else x)
+		trdf['locp']=loc;
+		trdf['prevloc']=pr;
+		# trdf.drop(['dur'],axis=1,inplace=True);
+		fintr = fintr.append(trdf, ignore_index=True);
+
+		# print(trdf)
+		# print(fr)
+		
+	fr = fr.append(fintr, ignore_index=True)
+
+	# frame['lweight'] = frame['lstd'] / frame['lstd'].sum();
+	# diff = np.abs(1440.0 - frame['length'].sum()) 
+
+	# actlist['length'] += np.floor(actlist['lweight'] * diff).fillna(1.0);
+
+	return fr;
 
 def manageseq(frame,tables,day):
 
@@ -490,16 +598,19 @@ def manageseq(frame,tables,day):
 
 	fr['prevloc'] = fr['locp'].shift(1).fillna(-1);
 
-	
 
 	fr[['locx','locy']] = fr.apply(locApply,args=(frame,),axis=1);
 
+	fr = mangletrips(fr,frame);
+
+
 	fr['agentnum']=frame.id;
 	
+	# print(fr);
 
 	fr.drop(['locp','prevloc'],axis=1,inplace=True);
 
-	# print(fr);
+	
 
 	return fr;
 
@@ -600,17 +711,28 @@ def parallelapplyfunc(splittable, grid, tables, day):
 	#tpgroup = transprob.groupby(['day','hour']);
 	
 	if(len(splittable) > 0):
-		supermat,xmin,ymin,supertraj = gridsum(splittable.iloc[0], grid, tables, day);
+		supermat,xmin,ymin,traj = gridsum(splittable.iloc[0], grid, tables, day);
 		
 		tshape = supermat.shape; #(24,3,x,y)
 		supershape = np.array([tshape[2],tshape[3]])
 		superor = np.array([xmin,ymin]);
+		supertraj = [traj]
+
+		memcount = 0; 
 		
 		#print('s',superor,supershape)
 		
 		for i in range(1,splittable.shape[0]):
 			mat, xmin, ymin,traj = gridsum(splittable.iloc[i], grid, tables, day);
-			supertraj = pd.concat([supertraj,traj],ignore_index=True)
+			memcount += traj.memory_usage(index=True).sum()
+			supertraj += [traj]
+
+			if(i % 100 == 0):
+				print("PID ",mp.current_process().pid,", step: ",i,", mem = ", memcount/1024/1024);
+				sys.stdout.flush();
+
+			# print('Memory usage: %s (kb)' % resource.getrusage(resource.RUSAGE_SELF).ru_maxrss, " PID:",mp.current_process())
+			# sys.stdout.flush()
 
 			tshape = mat.shape; #(24,3,x,y)
 			matshape = np.array([tshape[2],tshape[3]])
@@ -635,7 +757,7 @@ def parallelapplyfunc(splittable, grid, tables, day):
 			locmax = loc + matshape
 			supermat[:,:,int(loc[0]):int(locmax[0]),int(loc[1]):int(locmax[1])] += mat
 			
-			
+		supertraj = pd.concat(supertraj,ignore_index=True)
 		return supermat, superor[0], superor[1],supertraj;	
 
 def parallelapplydist(threads, table, grid, tables, day):
@@ -664,10 +786,12 @@ def parallelapplydist(threads, table, grid, tables, day):
 		supershape = np.array([tshape[2],tshape[3]])
 
 		superor = np.array([xmin,ymin]);
+		supertraj = []
 		
 		for i in range(1,len(out)):
 			mat, xmin, ymin,traj = out[i]
-			supertraj = pd.concat([supertraj,traj],ignore_index=True)
+			supertraj += [traj]
+
 
 			tshape = mat.shape; #(24,3,x,y)
 			matshape = np.array([tshape[2],tshape[3]])
@@ -690,7 +814,9 @@ def parallelapplydist(threads, table, grid, tables, day):
 			loc = mator - superor
 			locmax = loc + matshape
 			supermat[:,:,int(loc[0]):int(locmax[0]),int(loc[1]):int(locmax[1])] += mat
-			
+
+
+		supertraj = pd.concat(supertraj,ignore_index=True)	
 		return supermat, superor[0], superor[1],supertraj;	
 	else:
 		return None;
@@ -699,7 +825,9 @@ def parallelapplydist(threads, table, grid, tables, day):
 def runit(threads):
 	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
 	
-	# limiter = " limit 1000";
+	print("Threads:",threads)
+
+	# limiter = " limit 100";
 	limiter = ""
 	print("loading...")
 
@@ -779,7 +907,7 @@ def runit(threads):
 		# 	loc[j] = loc[j] / np.sum(loc[j])
 		prioritytab[i] = (wins,lens,jointprob,precede,whereprob);
 	# prior.close();
-
+	print([(i,k) for i,k in enumerate(actmapping)]);
 	ati = { tr:i for i,tr in enumerate(actmapping) }
 	ita = { i:tr for i,tr in enumerate(actmapping) }
 
@@ -806,11 +934,7 @@ def runit(threads):
 	traj['day'] = day;
 	traj['day365']=1;
 
-	outproj = pyproj.Proj(init='epsg:4326');
-	inproj = pyproj.Proj(init='epsg:26912');
-	def latlongtrans(x):
-		x.locx,x.locy=pyproj.transform(inproj,outproj,x.locx,x.locy);
-		return x
+
 
 	traj[["locx","locy"]] = traj[["locx","locy"]].apply(latlongtrans,axis=1);
 	traj.rename(index=str,columns={"locx":"long","locy":"lat"},inplace=True);
@@ -847,7 +971,7 @@ def runit(threads):
 if __name__ == '__main__':
 	threads = mkl.get_max_threads();
 	# threads = 2;
-	runit(threads)
+	runit(threads - 2)
 
 
 		

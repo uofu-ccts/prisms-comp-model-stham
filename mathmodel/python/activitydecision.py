@@ -606,7 +606,6 @@ def precsort(actind,precede):
 	
 	return np.sum(omat, axis=0);
 
-	
 
 def buildseqv2(wins,lens,jointprob,precede,whereprob):
 	#start,end,length, actind

@@ -31,33 +31,35 @@ rawmat = infile['populations'][:24,:3,:,:];
 # plt.plot(edge[:-1],hist)
 # plt.show()
 # maxval = np.max(rawmat)*0.5
-maxval = 1500.0
+# maxval = 1500.0
 
-rawmat[:,1,:,:] *= 20;
+
 
 #print(rawmat.shape);
 rawmat = np.swapaxes(rawmat,2,3)
 #print(rawmat.shape);
-#rawmat = rawmat / np.max(rawmat)
+# rawmat = rawmat / np.max(rawmat)
 
-rawmat = np.clip(rawmat, 0.0,maxval);
+
 # rawmat = np.log10(rawmat + 1);
-
+maxval = np.max(rawmat)
+rawmat = np.clip(rawmat, 0.0,maxval);
 print(maxval)
 
+rawmat[:,2,:,:] *= 10;
 
 #wasatch front
-xlim = (100,600)
-ylim = (600,1100)
+# xlim = (100,600)
+# ylim = (600,1100)
 
 #slc county
-# xlim = (315,415)
-# ylim = (750,850)
+xlim = (315,415)
+ylim = (750,850)
 
 c = 1;
-s = 0
-e = 23
-st = 4;
+s = 0   # starting hour
+e = 23  # ending hour
+st = 2; # stepsize
 
 plt.subplots_adjust(left=0.02, bottom=0.02, right=0.98, top=0.98, wspace=0.02, hspace=0.02)
 

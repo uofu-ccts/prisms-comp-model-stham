@@ -645,65 +645,21 @@ def gridsum( frame, grid, tables, day):
 	superout['actcode']=superout['actind'].apply(lambda x: tables[6][x]);
 
 	#align
-	superout['locxg'] = superout['locx'].apply(lambda x: np.round(x / grid, 0) )
-	superout['locyg'] = superout['locy'].apply(lambda x: np.round(x / grid, 0) )
+	# superout['locxg'] = superout['locx'].apply(lambda x: np.round(x / grid, 0) )
+	# superout['locyg'] = superout['locy'].apply(lambda x: np.round(x / grid, 0) )
 	
-	ymin = superout['locyg'].min()
-	ymax = superout['locyg'].max()
-	xmin = superout['locxg'].min()
-	xmax = superout['locxg'].max()
+	# ymin = superout['locyg'].min()
+	# ymax = superout['locyg'].max()
+	# xmin = superout['locxg'].min()
+	# xmax = superout['locxg'].max()
 	
 	#zero
-	superout['locxg'] = superout['locxg'].apply(lambda x: (x - xmin) )
-	superout['locyg'] = superout['locyg'].apply(lambda x: (x - ymin) )
-	
-	
-	#print(superout)
-	#print(xmin,xmax,ymin,ymax);
-
-	mat = np.zeros((24,3,int(xmax-xmin)+1,int(ymax-ymin)+1), dtype=np.uint32)
-	
-
-	for ind,f in superout.iterrows():
-
-		sind = int(np.floor(f['start']/60.0))
-		eind = min(24,int(np.floor(f['end']/60.0)));
-		 
-
-		fact = f['actcode']
-
-		act = 0;
-		if(fact >= 50000 and fact <= 59999):
-			act = 1;
-		#being at school counts as being at work in this iteration
-		#THIS IS A BAD IDEA
-		elif(fact >= 60000 and fact <= 60299):
-			act = 1;
-		elif(fact >= 180000 and fact <= 189999):
-			act = 2;
+	# superout['locxg'] = superout['locxg'].apply(lambda x: (x - xmin) )
+	# superout['locyg'] = superout['locyg'].apply(lambda x: (x - ymin) )
 		
-		for j in range(sind,eind):
-			mat[ j,act,int(f['locxg']),int(f['locyg']) ] += 1
-
-		#act 2 is complicated because we have a range of locations
-		#eg, loc1 -> loc2, all taxicab locations possible
-		#so we have to slice the locations
+	superout.drop(['end','actind'],axis=1,inplace=True);
 		
-		# 	#don't know where the next location is so assume we stay in grid
-		# if (i+1) < len(superout):
-		# 	nextf = superout.iloc[i+1]
-		# 	if(nextf.locx != f.locx and nextf.locy != f.locy):
-		# 		for j in range(sind,sind+delta):
-		# 			for x in np.arange(f['locx'], nextf['locx'],1.0):
-		# 				for y in np.arange(f['locy'], nextf['locy'],1.0):
-		# 					mat[ j,2,x,y ] += 1
-		
-		
-	superout.drop(['locxg','locyg','end','actind'],axis=1,inplace=True);
-		
-	
-	
-	return mat, xmin, ymin,superout;
+	return superout;
 
 #@profile
 def parallelapplyfunc(splittable, grid, tables, day):
@@ -711,56 +667,24 @@ def parallelapplyfunc(splittable, grid, tables, day):
 	#tpgroup = transprob.groupby(['day','hour']);
 	
 	if(len(splittable) > 0):
-		supermat,xmin,ymin,traj = gridsum(splittable.iloc[0], grid, tables, day);
-		
-		tshape = supermat.shape; #(24,3,x,y)
-		supershape = np.array([tshape[2],tshape[3]])
-		superor = np.array([xmin,ymin]);
-		supertraj = [traj]
+
+		supertraj = []
 
 		memcount = 0; 
-		
+
 		#print('s',superor,supershape)
 		
-		for i in range(1,splittable.shape[0]):
-			mat, xmin, ymin,traj = gridsum(splittable.iloc[i], grid, tables, day);
+		for i in range(0,splittable.shape[0]):
+			traj = gridsum(splittable.iloc[i], grid, tables, day);
 			memcount += traj.memory_usage(index=True).sum()
 			supertraj += [traj]
 
-
-
-			# print('Memory usage: %s (kb)' % resource.getrusage(resource.RUSAGE_SELF).ru_maxrss, " PID:",mp.current_process())
-			# sys.stdout.flush()
-
-			tshape = mat.shape; #(24,3,x,y)
-			matshape = np.array([tshape[2],tshape[3]])
-			mator = np.array([xmin,ymin])
-			newor = np.minimum(superor,mator);
-			newmax = np.maximum(superor+supershape,mator+matshape)
-			newshape = newmax-newor;
-			newshape = newshape
-			#reshape the matrix if needed
-			#print('s',superor,supershape+superor, 'm', mator,matshape+mator, 'n',newor,newshape+newor)
-			if( np.max(newshape - supershape) > 0 ):
-				#print("reshape")
-				newmat = np.zeros((24,3,int(newshape[0]),int(newshape[1])), dtype=np.uint32)
-				loc = superor - newor
-				locmax = loc + supershape
-				newmat[:,:,int(loc[0]):int(locmax[0]),int(loc[1]):int(locmax[1])] = supermat
-				supermat = newmat;
-				supershape = newshape
-				superor = newor
-			#add the new matrix
-			loc = mator - superor
-			locmax = loc + matshape
-			supermat[:,:,int(loc[0]):int(locmax[0]),int(loc[1]):int(locmax[1])] += mat
-
-			if(i % 100 == 0):
-				print("PID ",mp.current_process().pid,", step: ",i,", memtraj = ", memcount/1024/1024,", memmat = ", supermat.nbytes/1024/1024;
+			if(i % 1000 == 0):
+				print("PID ",mp.current_process().pid,", step: ",i,", mem = ", memcount/1024/1024);
 				sys.stdout.flush();
 			
 		supertraj = pd.concat(supertraj,ignore_index=True,axis=0)
-		return supermat, superor[0], superor[1],supertraj;	
+		return supertraj;	
 
 def parallelapplydist(threads, table, grid, tables, day):
 	#split table
@@ -782,44 +706,14 @@ def parallelapplydist(threads, table, grid, tables, day):
 	out = p.starmap(parallelapplyfunc,splittable);
 	
 	if(len(out) > 0):
-		supermat,xmin,ymin,traj = out[0]
-		tshape = supermat.shape; #(24,3,x,y)
-		
-		supershape = np.array([tshape[2],tshape[3]])
 
-		superor = np.array([xmin,ymin]);
-		supertraj = [traj]
-		
-		for i in range(1,len(out)):
-			mat, xmin, ymin,traj = out[i]
+		supertraj = []
+		for i in range(0,len(out)):
+			traj = out[i]
 			supertraj += [traj]
 
-
-			tshape = mat.shape; #(24,3,x,y)
-			matshape = np.array([tshape[2],tshape[3]])
-			mator = np.array([xmin,ymin])
-			newor = np.minimum(superor,mator);
-			newmax = np.maximum(superor+supershape,mator+matshape)
-			newshape = newmax-newor;
-			#reshape the matrix if needed
-			if( np.max(newshape - supershape) > 0 ):
-				#print("reshape")
-				newmat = np.zeros((24,3,int(newshape[0]),int(newshape[1])), dtype=np.uint32)
-				loc = superor - newor
-				locmax = loc + supershape
-				newmat[:,:,int(loc[0]):int(locmax[0]),int(loc[1]):int(locmax[1])] = supermat
-				supermat = newmat;
-				supershape = newshape
-				superor = newor
-				#print(supermat.shape)
-			#add the new matrix
-			loc = mator - superor
-			locmax = loc + matshape
-			supermat[:,:,int(loc[0]):int(locmax[0]),int(loc[1]):int(locmax[1])] += mat
-
-
 		supertraj = pd.concat(supertraj,ignore_index=True,axis=0)	
-		return supermat, superor[0], superor[1],supertraj;	
+		return supertraj;	
 	else:
 		return None;
 	
@@ -829,8 +723,9 @@ def runit(threads):
 	
 	print("Threads:",threads)
 
-	# limiter = " limit 100000";
 	limiter = ""
+	# limiter = " limit 100";
+	
 	print("loading...")
 
 	#NEED TO REDUCE MEMORY AND STUFF
@@ -933,34 +828,19 @@ def runit(threads):
 
 	#for day in range(1,8):
 	grid = 500.0
-	rawmat, x, y,traj = parallelapplydist(threads, ptable, grid,commontables,day )
+	traj = parallelapplydist(threads, ptable, grid,commontables,day )
 	traj['day'] = day;
 	traj['day365']=1;
-
-
-
 	traj[["locx","locy"]] = traj[["locx","locy"]].apply(latlongtrans,axis=1);
 	traj.rename(index=str,columns={"locx":"long","locy":"lat"},inplace=True);
 	# traj.drop(['locx','locy'],axis=1,inplace=True);
 
 	print(datetime.datetime.now().time().isoformat());
-
-	out = h5py.File(datapath + '/Finfluence'+str(day)+ ttt +'.h5')
-	ds = out.create_dataset('/populations',data=rawmat,fillvalue=0.,compression='gzip',compression_opts=9)
-	ds.attrs['xorigin'] = x * grid;
-	ds.attrs['yorigin'] = y * grid;
-	ds.attrs['day'] = day;
-	ds.attrs['date']=datetime.datetime.now().isoformat() #place holder
-	ds.attrs['grid']=grid
-	out.close();
 	
 	con = sqlite3.connect(datapath + '/Ftraj'+str(day)+ttt+'.sqlite3');
 	traj.to_sql('acttraj',con);
 	con.close();
 	
-	
-	print(x,y);
-	print(rawmat.shape);
 	exit();
 # 	plt.matshow(rawmat[10,0])
 # 	plt.show()
@@ -974,7 +854,7 @@ def runit(threads):
 if __name__ == '__main__':
 	threads = mkl.get_max_threads();
 	# threads = 2;
-	runit(threads - 2)
+	runit(threads - 1)
 
 
 		

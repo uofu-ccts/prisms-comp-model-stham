@@ -727,9 +727,7 @@ def parallelapplyfunc(splittable, grid, tables, day):
 			memcount += traj.memory_usage(index=True).sum()
 			supertraj += [traj]
 
-			if(i % 100 == 0):
-				print("PID ",mp.current_process().pid,", step: ",i,", mem = ", memcount/1024/1024);
-				sys.stdout.flush();
+
 
 			# print('Memory usage: %s (kb)' % resource.getrusage(resource.RUSAGE_SELF).ru_maxrss, " PID:",mp.current_process())
 			# sys.stdout.flush()
@@ -756,8 +754,12 @@ def parallelapplyfunc(splittable, grid, tables, day):
 			loc = mator - superor
 			locmax = loc + matshape
 			supermat[:,:,int(loc[0]):int(locmax[0]),int(loc[1]):int(locmax[1])] += mat
+
+			if(i % 100 == 0):
+				print("PID ",mp.current_process().pid,", step: ",i,", memtraj = ", memcount/1024/1024,", memmat = ", supermat.nbytes/1024/1024;
+				sys.stdout.flush();
 			
-		supertraj = pd.concat(supertraj,ignore_index=True)
+		supertraj = pd.concat(supertraj,ignore_index=True,axis=0)
 		return supermat, superor[0], superor[1],supertraj;	
 
 def parallelapplydist(threads, table, grid, tables, day):
@@ -780,13 +782,13 @@ def parallelapplydist(threads, table, grid, tables, day):
 	out = p.starmap(parallelapplyfunc,splittable);
 	
 	if(len(out) > 0):
-		supermat,xmin,ymin,supertraj = out[0]
+		supermat,xmin,ymin,traj = out[0]
 		tshape = supermat.shape; #(24,3,x,y)
 		
 		supershape = np.array([tshape[2],tshape[3]])
 
 		superor = np.array([xmin,ymin]);
-		supertraj = []
+		supertraj = [traj]
 		
 		for i in range(1,len(out)):
 			mat, xmin, ymin,traj = out[i]
@@ -816,7 +818,7 @@ def parallelapplydist(threads, table, grid, tables, day):
 			supermat[:,:,int(loc[0]):int(locmax[0]),int(loc[1]):int(locmax[1])] += mat
 
 
-		supertraj = pd.concat(supertraj,ignore_index=True)	
+		supertraj = pd.concat(supertraj,ignore_index=True,axis=0)	
 		return supermat, superor[0], superor[1],supertraj;	
 	else:
 		return None;
@@ -827,7 +829,7 @@ def runit(threads):
 	
 	print("Threads:",threads)
 
-	# limiter = " limit 100";
+	# limiter = " limit 100000";
 	limiter = ""
 	print("loading...")
 
@@ -930,7 +932,8 @@ def runit(threads):
 	# rawmat,x,y,traj = parallelapplyfunc(ptable.iloc[0:1000], 500.0,commontables, day )
 
 	#for day in range(1,8):
-	rawmat, x, y,traj = parallelapplydist(threads, ptable, 500.0,commontables,day )
+	grid = 500.0
+	rawmat, x, y,traj = parallelapplydist(threads, ptable, grid,commontables,day )
 	traj['day'] = day;
 	traj['day365']=1;
 
@@ -944,11 +947,11 @@ def runit(threads):
 
 	out = h5py.File(datapath + '/Finfluence'+str(day)+ ttt +'.h5')
 	ds = out.create_dataset('/populations',data=rawmat,fillvalue=0.,compression='gzip',compression_opts=9)
-	ds.attrs['xorigin'] = x * 500.0;
-	ds.attrs['yorigin'] = y * 500.0;
+	ds.attrs['xorigin'] = x * grid;
+	ds.attrs['yorigin'] = y * grid;
 	ds.attrs['day'] = day;
 	ds.attrs['date']=datetime.datetime.now().isoformat() #place holder
-	ds.attrs['grid']=500.0
+	ds.attrs['grid']=grid
 	out.close();
 	
 	con = sqlite3.connect(datapath + '/Ftraj'+str(day)+ttt+'.sqlite3');

@@ -507,19 +507,24 @@ def gettrip(lonx1,laty1,lonx2,laty2):
 	# print(data.getvalue());
 	dc = json.loads(data.getvalue())
 	# print(dc);
-	rcount = len(dc['routes']);
-	pick = np.random.randint(0,rcount);
-	# print(len(dc['routes'][pick]['geometry']['coordinates']), len(dc['routes'][pick]['legs'][0]['annotation']['distance']))
-	line = np.array(dc['routes'][pick]['geometry']['coordinates']).T
-	duration = np.array(dc['routes'][pick]['legs'][0]['annotation']['duration'] + [0.0])
-	dur = np.sum(duration)
-	
-	df = pd.DataFrame({"locx":line[0],"locy":line[1],"length":duration});
-	df['length'] = (df['length']/60.0)
+	if('routes' in dc):
+		rcount = len(dc['routes']);
+		pick = np.random.randint(0,rcount);
+		# print(len(dc['routes'][pick]['geometry']['coordinates']), len(dc['routes'][pick]['legs'][0]['annotation']['distance']))
+		line = np.array(dc['routes'][pick]['geometry']['coordinates']).T
+		duration = np.array(dc['routes'][pick]['legs'][0]['annotation']['duration'] + [0.0])
+		dur = np.sum(duration)
+		
+		df = pd.DataFrame({"locx":line[0],"locy":line[1],"length":duration});
+		df['length'] = (df['length']/60.0)
 
-	df[['locx','locy']] = df[['locx','locy']].apply(reversetrans, axis=1);
+		df[['locx','locy']] = df[['locx','locy']].apply(reversetrans, axis=1);
 
-	return df,dur;
+		return df,dur;
+	else:
+		print("ERROR DETECTED IN ROUTE: dumping json");
+		print(str(data.getvalue()))
+		return None,None;
 
 
 def mangletrips(fr,frame):
@@ -557,16 +562,17 @@ def mangletrips(fr,frame):
 		locnx,locny = latlongtransraw(locnx,locny);
 
 		trdf,dur = gettrip(locpx,locpy,locnx,locny);
+		if(type(trdf) != "NoneType"):
 
-		trdf['actind']=act;
-		trdf['start']=trdf['length'].cumsum()+low;
-		trdf['end']=trdf['start']+trdf['length']
-		trdf['start']=trdf['start'].apply(lambda x: 1440.0 if x > 1440.0 else x)
-		trdf['end']=trdf['end'].apply(lambda x: 1440.0 if x > 1440.0 else x)
-		trdf['locp']=loc;
-		trdf['prevloc']=pr;
-		# trdf.drop(['dur'],axis=1,inplace=True);
-		fintr = fintr.append(trdf, ignore_index=True);
+			trdf['actind']=act;
+			trdf['start']=trdf['length'].cumsum()+low;
+			trdf['end']=trdf['start']+trdf['length']
+			trdf['start']=trdf['start'].apply(lambda x: 1440.0 if x > 1440.0 else x)
+			trdf['end']=trdf['end'].apply(lambda x: 1440.0 if x > 1440.0 else x)
+			trdf['locp']=loc;
+			trdf['prevloc']=pr;
+			# trdf.drop(['dur'],axis=1,inplace=True);
+			fintr = fintr.append(trdf, ignore_index=True);
 
 		# print(trdf)
 		# print(fr)
@@ -595,6 +601,8 @@ def manageseq(frame,tables,day):
 
 	# fr = ad.buildseqv2(wins,lens,jointprob,precede,whereprob);
 	fr = ad.buildseqv2(tables[3][daytype][0],tables[3][daytype][1],tables[3][daytype][2],tables[3][daytype][3],tables[3][daytype][4]);
+	if(type(fr) == "NoneType"):
+		return nonmobile(frame);
 
 	fr['prevloc'] = fr['locp'].shift(1).fillna(-1);
 
@@ -658,11 +666,16 @@ def gridsum( frame, grid, tables, day):
 	# superout['locyg'] = superout['locyg'].apply(lambda x: (x - ymin) )
 		
 	superout.drop(['end','actind'],axis=1,inplace=True);
+
+	superout['day'] = day;
+	superout['day365']=1;
+	superout[["locx","locy"]] = superout[["locx","locy"]].apply(latlongtrans,axis=1);
+	superout.rename(index=str,columns={"locx":"long","locy":"lat"},inplace=True);
 		
 	return superout;
 
 #@profile
-def parallelapplyfunc(splittable, grid, tables, day):
+def parallelapplyfunc(splittable, grid, tables, day, outpath, ttt):
 	
 	#tpgroup = transprob.groupby(['day','hour']);
 	
@@ -674,19 +687,34 @@ def parallelapplyfunc(splittable, grid, tables, day):
 
 		#print('s',superor,supershape)
 		
+		con = sqlite3.connect(outpath + '/Ftraj'+str(day)+ttt+"-"+str(mp.current_process().pid)+'.sqlite3');
+
 		for i in range(0,splittable.shape[0]):
 			traj = gridsum(splittable.iloc[i], grid, tables, day);
 			memcount += traj.memory_usage(index=True).sum()
-			supertraj += [traj]
+			#supertraj += [traj]
+
+			traj.to_sql('acttraj',con,if_exists='append');
 
 			if(i % 1000 == 0):
 				print("PID ",mp.current_process().pid,", step: ",i,", mem = ", memcount/1024/1024);
 				sys.stdout.flush();
 			
-		supertraj = pd.concat(supertraj,ignore_index=True,axis=0)
-		return supertraj;	
+		# supertraj = pd.concat(supertraj,ignore_index=True,axis=0)
+		
 
-def parallelapplydist(threads, table, grid, tables, day):
+
+		# traj.drop(['locx','locy'],axis=1,inplace=True);
+
+		
+		
+		con.close();
+
+
+		return None;
+		#return supertraj;	
+
+def parallelapplydist(threads, table, grid, tables, day, outpath, ttt):
 	#split table
 	
 	splittable = []
@@ -699,23 +727,24 @@ def parallelapplydist(threads, table, grid, tables, day):
 		if e > tsize: e = tsize;
 		st = table.iloc[int(s):int(e)]
 		#splittable += [(table.iloc[int(s):int(e)],grid,tpgroup,weibull,day)];
-		splittable += [(st,grid,tables,day)]
+		splittable += [(st,grid,tables,day,outpath,ttt)]
 	
 	p = mp.Pool(threads);
 	
 	out = p.starmap(parallelapplyfunc,splittable);
 	
-	if(len(out) > 0):
+	# if(len(out) > 0):
 
-		supertraj = []
-		for i in range(0,len(out)):
-			traj = out[i]
-			supertraj += [traj]
+	# 	supertraj = []
+	# 	for i in range(0,len(out)):
+	# 		traj = out[i]
+	# 		supertraj += [traj]
 
-		supertraj = pd.concat(supertraj,ignore_index=True,axis=0)	
-		return supertraj;	
-	else:
-		return None;
+	# 	supertraj = pd.concat(supertraj,ignore_index=True,axis=0)	
+	# 	return supertraj;	
+	# else:
+	# 	return None;
+	return None;
 	
 #@profile
 def runit(threads):
@@ -828,18 +857,20 @@ def runit(threads):
 
 	#for day in range(1,8):
 	grid = 500.0
-	traj = parallelapplydist(threads, ptable, grid,commontables,day )
-	traj['day'] = day;
-	traj['day365']=1;
-	traj[["locx","locy"]] = traj[["locx","locy"]].apply(latlongtrans,axis=1);
-	traj.rename(index=str,columns={"locx":"long","locy":"lat"},inplace=True);
-	# traj.drop(['locx','locy'],axis=1,inplace=True);
+	traj = parallelapplydist(threads, ptable, grid,commontables,day,datapath,ttt )
+	# traj['day'] = day;
+	# traj['day365']=1;
+	# traj[["locx","locy"]] = traj[["locx","locy"]].apply(latlongtrans,axis=1);
+	# traj.rename(index=str,columns={"locx":"long","locy":"lat"},inplace=True);
+	# # traj.drop(['locx','locy'],axis=1,inplace=True);
+
+	# con = sqlite3.connect(datapath + '/Ftraj'+str(day)+ttt+'.sqlite3');
+	# traj.to_sql('acttraj',con);
+	# con.close();
 
 	print(datetime.datetime.now().time().isoformat());
 	
-	con = sqlite3.connect(datapath + '/Ftraj'+str(day)+ttt+'.sqlite3');
-	traj.to_sql('acttraj',con);
-	con.close();
+
 	
 	exit();
 # 	plt.matshow(rawmat[10,0])

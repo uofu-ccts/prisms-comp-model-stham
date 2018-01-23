@@ -542,8 +542,8 @@ def verticalnorm(mat):
 def picklen(x, lens, jprob):
 	# print(x,jprob[x]);
 	win = jprob[x].sample(n=1,weights=jprob[x]).index[0]	
-	return lens.iloc[win][['lmin','lmax','lavg','lstd','lhist']]
-
+	out = lens.iloc[win][['lmin','lmax','lavg','lstd','lhist']]
+	return out;
 
 
 #defines a matrix for the order of probability windows
@@ -614,7 +614,13 @@ def buildseqv2(wins,lens,jointprob,precede,whereprob):
 
 	actlist = wins[np.random.rand(winlen) < wins['prob'].values];
 	# print(actlist);
-	actlist[['lmin','lmax','lavg','lstd','lhist']] = actlist.index.to_series().apply(picklen, args=(lens,jointprob));
+	try:
+		actlist[['lmin','lmax','lavg','lstd','lhist']] = actlist.index.to_series().apply(picklen, args=(lens,jointprob));
+	except KeyError:
+		print("There was a keyerror on this iteration: ")
+		print(actlist, jointprob, lens);
+		return None;
+
 
 	#ctlist['length'] = actlist.apply(lambda x: x.lstd * np.random.randn() + x.lavg, axis=1)
 	actlist['length'] = actlist['lhist'].apply(lambda x: np.random.choice(x[1],p=x[0])).fillna(1.0);

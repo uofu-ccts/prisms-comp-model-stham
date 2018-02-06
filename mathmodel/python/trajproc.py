@@ -100,8 +100,9 @@ mat = scipy.sparse.dok_matrix((xd,yd));
 
 lastact = [-1.,-1.,-1.,-1.] #act, agentnum, lastx, lasty
 
-winmax = 655.0
-winmin = 640.0
+winmin = 0.0
+winmax = 1439.0
+
 
 for i in range(0, maxrow, blocksize):
 	if( i % (100000) == 0): 

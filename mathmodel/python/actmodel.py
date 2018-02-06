@@ -16,10 +16,21 @@ import pycurl;
 from io import BytesIO;
 import json;
 import resource;
+import rtree;
 
 sys.path.append("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/mathmodel/python");
 import activitydecision as ad;
 
+
+locprobtab = np.array([ 0.02666667,  0.02639456,  0.02612245,  0.02585034,  0.02557823, 0.02530612,0.02503401,  0.0247619 , 0.0244898 ,  0.02421769, 0.02394558,  0.02367347, 0.02340136,  0.02312925,  0.02285714, 0.02258503,  0.02231293,  0.02204082,  0.02176871, 0.0214966 , 0.02122449,0.02095238,  0.02068027,  0.02040816,  0.02013605, 0.01986395, 0.01959184,  0.01931973,  0.01904762,  0.01877551, 0.0185034 ,  0.01823129,  0.01795918, 0.01768707,  0.01741497, 0.01714286,0.01687075,  0.01659864,  0.01632653,  0.01605442, 0.01578231,  0.0155102 ,  0.0152381 , 0.01496599,  0.01469388, 0.01442177,  0.01414966,  0.01387755,  0.01360544,  0.01333333])
+
+
+def buildloctree(frame):
+	p=rtree.index.Property(variant=rtree.index.RT_Star)
+	idx = rtree.index.Rtree(properties=p)
+	for ind,i in frame.iterrows():
+		idx.insert(ind,(i.x,i.y,i.x,i.y));
+	return idx
 
 
 #wac = pd.read_csv(datapath + "lehd/ut_wac_S000_JT00_2014.csv")
@@ -261,7 +272,7 @@ def pickschool(x):
 
 
 
-def locApply(x,frame):
+def locApply(x,frame,idx):
 
 	# print(x,fr)
 	if(frame.empx == 0.0 and frame.empy == 0.0):
@@ -277,18 +288,16 @@ def locApply(x,frame):
 		return pd.Series([frame.addrx,frame.addry]);
 	elif(_locp == 2.):
 		return pd.Series([frame.empx, frame.empy]);
-	elif(_locp == 8.):
-		if frame.schoollevel == 0. : grid = 3500.0
-		if frame.schoollevel == 1. : grid = 1000.0
-		if frame.schoollevel == 2. : grid = 2000.0
-		if frame.schoollevel == 3. : grid = 3000.0
-		elif frame.schoollevel == 4.: grid = 8000.0
-		else: grid = 4000.0;
-		locx = np.round(frame.addrx / grid,0)*grid;
-		locy = np.round(frame.addry / grid,0)*grid;
-		return pd.Series([locx,locy]);
-	
-
+	# elif(_locp == 8.):
+	# 	if frame.schoollevel == 0. : grid = 3500.0
+	# 	if frame.schoollevel == 1. : grid = 1000.0
+	# 	if frame.schoollevel == 2. : grid = 2000.0
+	# 	if frame.schoollevel == 3. : grid = 3000.0
+	# 	elif frame.schoollevel == 4.: grid = 8000.0
+	# 	else: grid = 4000.0;
+	# 	locx = np.round(frame.addrx / grid,0)*grid;
+	# 	locy = np.round(frame.addry / grid,0)*grid;
+	# 	return pd.Series([locx,locy]);
 
 	else: 
 		if x.prevloc == 2.:
@@ -296,7 +305,11 @@ def locApply(x,frame):
 		else:
 			locx,locy = frame.addrx, frame.addry
 		
-		return pd.Series([locx+norm.rvs(scale=1000.0),locy+norm.rvs(scale=1000.0)])
+		#take nearest 50 locations and distribute them linearly with a constant probability
+		s = list(idx.nearest((locx,locy,locx,locy),50,objects=True))
+		pick = np.random.choice(50,p=locprobtab)
+		# print(pick, len(s))
+		return pd.Series([s[pick].bbox[0],s[pick].bbox[1]])
 
 	# 1 Respondent's home or yard KNOWN
 	# 2 Respondent's workplace KNOWN
@@ -338,6 +351,7 @@ def daypick(frame,tables,day):
 	ati = tables[5];
 	ita = tables[6];
 	itl = tables[7];
+	idx = tables[8]
 
 	#determine school/work fixed params
 	#????????????????? TODO FIX
@@ -586,7 +600,7 @@ def mangletrips(fr,frame):
 
 	return fr;
 
-def manageseq(frame,tables,day):
+def manageseq(frame,tables,day,idx):
 
 	# ita = tables[6];
 
@@ -607,7 +621,7 @@ def manageseq(frame,tables,day):
 	fr['prevloc'] = fr['locp'].shift(1).fillna(-1);
 
 
-	fr[['locx','locy']] = fr.apply(locApply,args=(frame,),axis=1);
+	fr[['locx','locy']] = fr.apply(locApply,args=(frame,idx),axis=1);
 
 	fr = mangletrips(fr,frame);
 
@@ -623,12 +637,12 @@ def manageseq(frame,tables,day):
 	return fr;
 
 
-def superfunc(frame, tables, day):
+def superfunc(frame, tables, day,idx):
 	#mobile or non-mobile?
 	if frame['mobile'] == False:
 		return nonmobile(frame)
 	else:
-		return manageseq(frame, tables, day);
+		return manageseq(frame, tables, day,idx);
 		#OLD STUFF
 		# return daypick(frame,tables,day);
 		#OLDER STUFF
@@ -641,14 +655,14 @@ def superfunc(frame, tables, day):
 		# 		return depchild(frame, tables, day);
 
 #takes the superfunction and gets the horuly grid location activity profile of the user 
-def gridsum( frame, grid, tables, day):
+def gridsum( frame, grid, tables, day,idx):
 	
 
 	# superout = pd.DataFrame(superfunc(frame,tables, day))
 
 	# superout.columns = ['t','act','locx','locy']
 
-	superout = superfunc(frame,tables,day);
+	superout = superfunc(frame,tables,day,idx);
 
 	superout['actcode']=superout['actind'].apply(lambda x: tables[6][x]);
 
@@ -679,6 +693,8 @@ def parallelapplyfunc(splittable, grid, tables, day, outpath, ttt):
 	
 	#tpgroup = transprob.groupby(['day','hour']);
 	
+	idx = buildloctree(tables[8])
+
 	if(len(splittable) > 0):
 
 		supertraj = []
@@ -690,7 +706,7 @@ def parallelapplyfunc(splittable, grid, tables, day, outpath, ttt):
 		con = sqlite3.connect(outpath + '/Ftraj'+str(day)+ttt+"-"+str(mp.current_process().pid)+'.sqlite3');
 
 		for i in range(0,splittable.shape[0]):
-			traj = gridsum(splittable.iloc[i], grid, tables, day);
+			traj = gridsum(splittable.iloc[i], grid, tables, day,idx);
 			memcount += traj.memory_usage(index=True).sum()
 			#supertraj += [traj]
 
@@ -753,7 +769,7 @@ def runit(threads):
 	print("Threads:",threads)
 
 	limiter = ""
-	# limiter = " limit 100";
+	# limiter = " limit 1000";
 	
 	print("loading...")
 
@@ -798,6 +814,10 @@ def runit(threads):
 	
 	#tpgroup = transprob.groupby(['day','hour']);
 	
+	randlocs = pd.read_csv(datapath + "randlocs.csv");
+	# idx = buildloctree(randlocs);
+	print("randloc len: ", len(randlocs));
+
 	con = sqlite3.connect(datapath + "weibull.sq3");
 	weibull = pd.read_sql("select * from weibull", con);
 	con.close();
@@ -839,7 +859,7 @@ def runit(threads):
 
 	itl = { i:tr for i,tr in enumerate(locmapping) }
 
-	commontables = (weibull, weekdayarr, weekendarr, prioritytab, actmapping, ati, ita,  itl )
+	commontables = (weibull, weekdayarr, weekendarr, prioritytab, actmapping, ati, ita,  itl, randlocs )
 
 
 

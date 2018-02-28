@@ -607,7 +607,7 @@ def precsort(actind,precede):
 	return np.sum(omat, axis=0);
 
 
-def buildseqv2(wins,lens,jointprob,precede,whereprob):
+def buildseqv2(wins,lens,jointprob,precede,whereprob, dropind):
 	#start,end,length, actind
 
 	winlen = len(wins)
@@ -622,6 +622,8 @@ def buildseqv2(wins,lens,jointprob,precede,whereprob):
 		return None;
 
 
+
+
 	#ctlist['length'] = actlist.apply(lambda x: x.lstd * np.random.randn() + x.lavg, axis=1)
 	actlist['length'] = actlist['lhist'].apply(lambda x: np.random.choice(x[1],p=x[0])).fillna(1.0);
 	actlist['length'] = actlist['length'].apply(lambda x: (1.0 if x < 1.0 else np.floor(x)));
@@ -632,19 +634,39 @@ def buildseqv2(wins,lens,jointprob,precede,whereprob):
 	actlist = actlist.sort_values(['precscore','wavg','wmin','length','wmax',]);
 
 
+	#eliminate travel acts with precomputed tables
+	actlist = actlist.drop(dropind);
 
-	actlist['lweight'] = actlist['lstd'] / actlist['lstd'].sum();
-	diff = 1440 - actlist['length'].sum() 
-
-	actlist['length'] += np.floor(actlist['lweight'] * diff).fillna(1.0);
-
-
-	actlist['end'] = actlist['length'].cumsum();
-	actlist['start'] = actlist['end'] - actlist['length']
-
-	actlist['validwin'] = actlist.apply(lambda x: 1.0 if x.start <= x.wmax and x.start >= x.wmin else 0.0,axis=1)
-
+	#assign locations and start criticality
+	#-start criticality means that the start of the activity is non-movable
+	#-if criticality is true then previous activities are pushed earlier
+	#-if criticality is false then future acts are pushed later
+	#this is performed in the order of activities
+	#trips are assigned an arbitrary travel time of 15 minutes because
+	#trip times cannot be known yet
 	actlist['locp'] = actlist.index.to_series().apply(lambda x: whereprob[x].sample(n=1,weights=whereprob[x]).index[0]).fillna(-1);
+	actlist['prevloc'] = actlist['locp'].shift(1).fillna(-1);
+	actlist['loccrit'] = np.random.choice( (0,1),size=len(actlist) );
+
+	#FIXME: insert and sort trips
+
+
+
+
+	#this is probably bad; does this work right?
+	# actlist['lweight'] = actlist['lstd'] / actlist['lstd'].sum();
+	# diff = 1440 - actlist['length'].sum() 
+
+	# actlist['length'] += np.floor(actlist['lweight'] * diff).fillna(1.0);
+
+
+	# actlist['end'] = actlist['length'].cumsum();
+	# actlist['start'] = actlist['end'] - actlist['length']
+
+	# actlist['validwin'] = actlist.apply(lambda x: 1.0 if x.start <= x.wmax and x.start >= x.wmin else 0.0,axis=1)
+
+
+
 	
 	# actlist.iloc[len(actlist)-1]['end'] = 1439.0
 

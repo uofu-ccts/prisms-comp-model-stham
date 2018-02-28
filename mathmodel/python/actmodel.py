@@ -18,8 +18,8 @@ import json;
 import resource;
 import rtree;
 
-sys.path.append("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/mathmodel/python");
-import activitydecision as ad;
+# sys.path.append("/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/mathmodel/python");
+# import activitydecision as ad;
 
 
 locprobtab = np.array([ 0.02666667,  0.02639456,  0.02612245,  0.02585034,  0.02557823, 0.02530612,0.02503401,  0.0247619 , 0.0244898 ,  0.02421769, 0.02394558,  0.02367347, 0.02340136,  0.02312925,  0.02285714, 0.02258503,  0.02231293,  0.02204082,  0.02176871, 0.0214966 , 0.02122449,0.02095238,  0.02068027,  0.02040816,  0.02013605, 0.01986395, 0.01959184,  0.01931973,  0.01904762,  0.01877551, 0.0185034 ,  0.01823129,  0.01795918, 0.01768707,  0.01741497, 0.01714286,0.01687075,  0.01659864,  0.01632653,  0.01605442, 0.01578231,  0.0155102 ,  0.0152381 , 0.01496599,  0.01469388, 0.01442177,  0.01414966,  0.01387755,  0.01360544,  0.01333333])
@@ -533,7 +533,7 @@ def gettrip(lonx1,laty1,lonx2,laty2):
 		df['length'] = (df['length']/60.0)
 
 		df[['locx','locy']] = df[['locx','locy']].apply(reversetrans, axis=1);
-
+		df['triporder'] = np.arange(0,len(df));
 		return df,dur;
 	else:
 		print("ERROR DETECTED IN ROUTE: dumping json");
@@ -545,7 +545,8 @@ def mangletrips(fr,frame):
 
 	
 	#trips = fr['locp'].isin([12,13,14,15,16,17,18,19,20,21,99]).index;
-	trips = fr[fr['actind'] < 382][fr['actind'] > 313].index
+	# trips = fr[fr['actind'] < 382][fr['actind'] > 313].index
+	trips = fr[fr['locp'] != fr['prevloc']].index
 	fintr = pd.DataFrame();
 
 	for ind in trips:
@@ -567,8 +568,8 @@ def mangletrips(fr,frame):
 		fr.loc[ind]['locx'] = locpx;
 		fr.loc[ind]['locy'] = locpy;
 		act = fr.loc[ind]['actind']
-		low = fr.loc[ind]['start']
-		high = fr.loc[ind]['end']
+		# low = fr.loc[ind]['start']
+		# high = fr.loc[ind]['end']
 		pr = fr.loc[ind]['prevloc']
 		loc = fr.loc[ind]['locp']
 
@@ -578,13 +579,14 @@ def mangletrips(fr,frame):
 		trdf,dur = gettrip(locpx,locpy,locnx,locny);
 		if(type(trdf) != "NoneType"):
 
-			trdf['actind']=act;
-			trdf['start']=trdf['length'].cumsum()+low;
-			trdf['end']=trdf['start']+trdf['length']
-			trdf['start']=trdf['start'].apply(lambda x: 1440.0 if x > 1440.0 else x)
-			trdf['end']=trdf['end'].apply(lambda x: 1440.0 if x > 1440.0 else x)
-			trdf['locp']=loc;
-			trdf['prevloc']=pr;
+			trdf['actind']=381; #FIXME: need a better coding system here
+			trdf['actorder']=fr.loc[ind]['actorder']-1;
+			# trdf['start']=trdf['length'].cumsum()+low;
+			# trdf['end']=trdf['start']+trdf['length']
+			# trdf['start']=trdf['start'].apply(lambda x: 1440.0 if x > 1440.0 else x)
+			# trdf['end']=trdf['end'].apply(lambda x: 1440.0 if x > 1440.0 else x)
+			# trdf['locp']=loc;
+			# trdf['prevloc']=pr;
 			# trdf.drop(['dur'],axis=1,inplace=True);
 			fintr = fintr.append(trdf, ignore_index=True);
 
@@ -600,6 +602,170 @@ def mangletrips(fr,frame):
 
 	return fr;
 
+
+def picklen(x, lens, jprob):
+	# print(x,jprob[x]);
+	win = jprob[x].sample(n=1,weights=jprob[x]).index[0]	
+	out = lens.iloc[win][['lmin','lmax','lavg','lstd','lhist']]
+	return out;
+
+
+def precsort(actind,precede):
+	actlen = len(actind);
+	
+	pmat = np.random.rand(actlen,actlen);
+	omat = np.zeros((actlen,actlen));
+
+	for i in range(actlen):
+		for j in range(i+1,actlen):
+			result = pmat[i,j] < precede[actind[i],actind[j]]
+			omat[i,j] = (1.0 if result else 0.0)
+			omat[j,i] = (0.0 if result else 1.0)
+	
+	return np.sum(omat, axis=0);
+
+
+def buildseqv2(frame,wins,lens,jointprob,precede,whereprob, dropind,idx):
+	#start,end,length, actind
+
+	winlen = len(wins)
+
+	
+	#FIXME: need to take density into account
+
+
+
+	# actlist = wins[np.random.rand(winlen) < wins['prob'].values].copy(deep=True);
+
+
+	picks = [] 
+	#pick non-picked elements in the non-covered region with accompanying lengths up to three times until coverage is > 0.95
+	actlist = []
+	coverage = np.zeros((1440,))
+	allpicks = np.full(winlen,False)
+	for i in range(3):
+
+		covfrac = np.sum(coverage)/1440.0
+		print("Covfrac: ", i, " ", covfrac)
+		if(covfrac < 0.95):
+			minpoint = np.argmin(coverage);
+			maxpoint = 1440 - np.argmin(coverage[::-1])
+			#  [np.random.rand(winlen) < wins['prob'].values]
+			winselect = (wins['wmax'] >= minpoint) & (wins['wmin'] <= maxpoint) & np.invert(allpicks)
+			
+			picks += [winselect & (np.random.rand(winlen) < wins['prob'].values)]
+			allpicks = allpicks | picks[i]
+			print(minpoint, maxpoint)
+		else:
+			break;
+		
+		
+		actlist += [wins[picks[i]].copy(deep=True)];
+		print(actlist[i]);
+		try:
+			if(len(actlist[i]) > 1):
+				actlist[i][['lmin','lmax','lavg','lstd','lhist']] = actlist[i].index.to_series().apply(picklen, args=(lens,jointprob));
+			
+				
+		except KeyError:
+			print("There was a keyerror on this iteration: ")
+			print(actlist, jointprob, lens);
+			return None;
+		
+
+		
+
+		for ind,df in actlist[i].iterrows():
+			coverage[df.wmin:(df.wmin+df.lmax)] = 1.0
+
+	coverage = np.reshape(coverage,(48,30))
+	covdist = np.sum(coverage,axis=1)/30
+	print(covdist)
+
+	covfrac = np.sum(coverage)/1440.0
+	print("Covfrac: ", i, " ", covfrac)
+	print(actlist)
+
+	actlist = pd.concat(actlist);
+	
+
+	# print(actlist)
+	
+	#ctlist['length'] = actlist.apply(lambda x: x.lstd * np.random.randn() + x.lavg, axis=1)
+
+	actlist['length'] = actlist['lhist'].apply(lambda x: np.random.choice(x[1],p=x[0])).fillna(1.0);
+	actlist['length'] = actlist['length'].apply(lambda x: (1.0 if x < 1.0 else np.floor(x)));
+	
+	#three tries to get enough lmax
+	# for i in range(0,3):
+	# 	actlist['picked'] = np.maximum(np.random.rand(winlen), 
+		
+
+	actind = np.array(actlist.index);
+	actlist['precscore'] = precsort(actind,precede)
+	actlist = actlist.sort_values(['precscore','wavg','wmin','length','wmax',]);
+	actlist['actorder'] = np.arange(0,len(actlist)*2,2);
+
+	print(actlist)
+
+	actlist['locp'] = actlist.index.to_series().apply(lambda x: whereprob[x].sample(n=1,weights=whereprob[x]).index[0]).fillna(-1);
+	actlist['prevloc'] = actlist['locp'].shift(1).fillna(-1);
+
+
+	actlist[['locx','locy']] = actlist.apply(locApply,args=(frame,idx),axis=1);
+	actlist['triporder'] = np.nan;
+
+	actlist = mangletrips(actlist,frame);
+
+
+	actlist = actlist.sort_values(['actorder','triporder']).reset_index(drop=True);
+
+
+
+	#this is probably bad; does this work right?
+	# actlist['lweight'] = actlist['lstd'] / actlist['lstd'].sum();
+	# diff = 1440 - actlist['length'].sum() 
+
+	# actlist['length'] += np.floor(actlist['lweight'] * diff).fillna(1.0);
+
+	#CUMSUM IS WRONG; need window smearing that puts activities in their windows correctly
+	actlist['end'] = actlist['length'].cumsum();
+	actlist['start'] = actlist['end'] - actlist['length']
+	# actlist['start'] = actlist.apply(lambda x: x.wmin if x.start < x.wmin else x.start  , axis=1)
+	# actlist['end'] = actlist['start'] + actlist['length']
+
+	delta = 1440.0 - actlist['length'].sum()
+	print("delta: ", delta);
+	actlist['lmaxsmear'] = actlist['lmax'] - actlist['length']
+	actlist['lminsmear'] = actlist['length'] - actlist['lmin']
+	actlist['wminerror'] = np.abs(np.minimum(0.0,actlist['start'] - actlist['wmin'])) #haha bad joke	
+	actlist['wmaxerror'] = np.minimum(0.0,actlist['wmax'] - actlist['start'])
+
+	actlist['validwin'] = actlist.apply(lambda x: 1.0 if x.start <= x.wmax and x.start >= x.wmin else 0.0,axis=1)
+
+	if(delta > 0):
+		pass
+	else:
+		pass
+	
+	
+	
+	
+	# actlist.iloc[len(actlist)-1]['end'] = 1439.0
+	print("sum lmaxsmear: ",actlist['lmaxsmear'].sum())
+	print("sum lminsmear: ",actlist['lminsmear'].sum())
+	print("sum length: ",actlist['length'].sum())
+	# print(actlist[actlist['density'] >= 0.0])
+	# print(actlist)
+
+
+
+
+	actlist.drop(['wincount','winuniq','density','ref','prob','wmin','wmax','wavg','wstd','lmin','lmax','lavg','lstd','precscore','validwin','lhist','triporder','actorder','locp','prevloc','lminsmear','lmaxsmear','wminerror','wmaxerror'],axis=1,inplace=True) #lweight
+
+	return actlist;
+
+
 def manageseq(frame,tables,day,idx):
 
 	# ita = tables[6];
@@ -614,23 +780,20 @@ def manageseq(frame,tables,day,idx):
 	# whereprob = tables[3][daytype][4]
 
 	# fr = ad.buildseqv2(wins,lens,jointprob,precede,whereprob);
-	fr = ad.buildseqv2(tables[3][daytype][0],tables[3][daytype][1],tables[3][daytype][2],tables[3][daytype][3],tables[3][daytype][4]);
+	fr = buildseqv2(frame,tables[3][daytype][0],tables[3][daytype][1],tables[3][daytype][2],tables[3][daytype][3],tables[3][daytype][4], tables[9],idx);
 	if(type(fr) == "NoneType"):
 		return nonmobile(frame);
 
-	fr['prevloc'] = fr['locp'].shift(1).fillna(-1);
+	# fr['prevloc'] = fr['locp'].shift(1).fillna(-1);
 
 
-	fr[['locx','locy']] = fr.apply(locApply,args=(frame,idx),axis=1);
-
-	fr = mangletrips(fr,frame);
 
 
 	fr['agentnum']=frame.id;
 	
 	# print(fr);
 
-	fr.drop(['locp','prevloc'],axis=1,inplace=True);
+	# fr.drop(['locp','prevloc'],axis=1,inplace=True);
 
 	
 
@@ -769,7 +932,7 @@ def runit(threads):
 	print("Threads:",threads)
 
 	limiter = ""
-	# limiter = " limit 1000";
+	limiter = " limit 100";
 	
 	print("loading...")
 
@@ -832,11 +995,15 @@ def runit(threads):
 
 	prioritytab = {}
 
+	
+
 	prior = h5py.File(datapath + "actwindows.h5",'r');
 	labels = prior["/labels"][:]
 	actmapping = prior["/actmapping"][:];
 	locmapping = prior["/locmapping"][:];
 	prior.close();
+
+	dropind = [i for i,k in enumerate(actmapping) if k >= 180000 and k < 189999]
 
 	for i in labels:
 		g = "/label-"+str(i)
@@ -845,6 +1012,9 @@ def runit(threads):
 		jointprob = pd.read_hdf(datapath + "actwindows.h5",key=g+"/jointprob");
 		precede = pd.read_hdf(datapath + "actwindows.h5",key=g+"/precede").values;
 		whereprob = pd.read_hdf(datapath + "actwindows.h5",key=g+"/whereprob");
+
+		wins = wins.drop(wins[wins['actind'].apply(lambda x:x in dropind)].index);
+
 		# avg = prior[g+"/avginstances"][:];
 		# pri = prior[g+"/priorities"][:];
 		# epri = prior[g+"/epriorities"][:];
@@ -859,7 +1029,9 @@ def runit(threads):
 
 	itl = { i:tr for i,tr in enumerate(locmapping) }
 
-	commontables = (weibull, weekdayarr, weekendarr, prioritytab, actmapping, ati, ita,  itl, randlocs )
+	
+
+	commontables = (weibull, weekdayarr, weekendarr, prioritytab, actmapping, ati, ita,  itl, randlocs, dropind )
 
 
 
@@ -904,7 +1076,7 @@ def runit(threads):
 
 if __name__ == '__main__':
 	threads = mkl.get_max_threads();
-	# threads = 2;
+	threads = 2;
 	runit(threads - 1)
 
 

@@ -8,8 +8,10 @@ import pyproj;
 import datetime;
 import h5py;
 import multiprocessing as mp;
+import mkl;
+import sqlalchemy;
 
-blocksize = 100000; #records
+blocksize = 1000000; #records
 gridsize = 100.0; # meters
 timesplit = 15.0 # minutes
 
@@ -66,16 +68,22 @@ def bresenham(x0,y0,x1,y1):
 		out += [(x,y)]
 	return out;
 
-def bsrifywmax(mat):
+
+def bsrify(mat):
 	newmat = []
-	maxvals = np.zeros((len(mat[0])))
 	for i in range(len(mat)):
 		submat = []
 		for j in range(len(mat[i])):
 			submat += [mat[i][j].tobsr()]
-			maxvals[j] = max(submat[j].max(),maxvals[j])
 		newmat += [submat]
-	return newmat,maxvals;
+	return newmat;
+
+def wmax(mat):
+	maxvals = np.zeros((len(mat[0])))
+	for i in range(len(mat)):
+		for j in range(len(mat[i])):
+			maxvals[j] = max(mat[i][j].max(),maxvals[j])
+	return maxvals;
 
 def speedlimit(x0,y0,x1,y1,t,limit):
 	if not (t > 0): return True;
@@ -85,13 +93,15 @@ def speedlimit(x0,y0,x1,y1,t,limit):
 	return False;
 
 
-def runblock(path, st, en, griddims, stepsize):
+def runblock(frame, griddims, stepsize):
 
 
 	steps = 1440 // stepsize;
 	
-	con = sqlite3.connect(path);
-	
+	# engine = sqlalchemy.create_engine("sqlite:///"+path);
+	# con = sqlite3.connect(path);
+
+
 	xd,yd,gs,mindim = griddims;
 
 	mats = [];
@@ -105,53 +115,143 @@ def runblock(path, st, en, griddims, stepsize):
 	# print("Lenmats ",len(mats))
 	# print("Dims ", griddims)
 
-	lastact = [-1.,-1.,-1.,-1.]
+	
 
 	winmin = np.arange(0,1440,stepsize)
 	winmax = winmin + stepsize
 	# print(winmin, winmax)
 
+	# for i in range(st, en, blocksize):
+	# 	if( i % (blocksize) == 0): 
+	# 		print(i,end=' ');
+	# 		sys.stdout.flush();
+	# 	outblock = (en - i) if( (en - i) < blocksize ) else blocksize;
+		
+		# d = pd.read_sql_query("select * from acttraj limit "+str(i)+","+str(outblock),con);
+	
+	# print(frame.iloc[0].long,frame.iloc[0].lat)
+
+
+	x,y = 0,0
+	if(frame.iloc[0].long <= regmaxlong and frame.iloc[0].long >= regminlong and \
+	frame.iloc[0].lat <= regmaxlat and frame.iloc[0].lat >= regminlat):
+		locx,locy = reversetransraw(frame.iloc[0].long,frame.iloc[0].lat);
+		x,y = getgrid(locx,locy,gs,mindim);
+
+	lastact = [frame.iloc[0].actcode,frame.iloc[0].actcode,x,y]
+
+
+
+		# print(d);
+	for ind,f in frame.iloc[1:].iterrows():
+		end = min(f.start+f.length,1439)
+		#if( f.start < winmax and end > winmin):
+		slotst = int(np.floor(f.start/stepsize))
+		sloten = int(np.floor(end/stepsize))+1
+		# print(f.actcode,f.start,slotst,end,sloten)
+		for slot in range(int(slotst),int(sloten)):
+			# winmin = slot*stepsize; winmax = winmin + stepsize;
+			if(f.long <= regmaxlong and f.long >= regminlong and \
+			f.lat <= regmaxlat and f.lat >= regminlat):
+				locx,locy = reversetransraw(f.long,f.lat);
+				x,y = getgrid(locx,locy,gs,mindim);
+				# if(x >= 0 and x < xd and y >=0 and y < yd):
+				weight = min(end, winmax[slot]) - max(f.start,winmin[slot])
+				# print(weight)
+				if(f.actcode >= 180000 and f.actcode <=189999):
+					if(lastact[0] == f.actcode and lastact[1] == f.agentnum):
+						#speed limit - we assume max speed of 50 m/s 
+						if not(speedlimit(x,y,lastact[2],lastact[3],weight, 50.0)):
+							# mats[slot][2][x,y] += weight;
+						# else:
+							line = bresenham(x,y,lastact[2],lastact[3])[:-1];
+							cline = len(line)
+							for t in range(len(line)):
+								mats[slot][2][line[t][0],line[t][1]] += (weight / cline);
+					# else:
+						# mats[slot][2][x,y] += weight;
+				elif (f.actcode >= 50000 and f.actcode <=59999):
+					mats[slot][1][x,y] += weight;
+				else: 
+					mats[slot][0][x,y] += weight;
+
+				lastact = [f.actcode,f.agentnum,x,y]
+					
+	# con.close();
+
+	return bsrify(mats);
+
+
+
+def chunker(path,q, st,en):
+	
+	con = sqlite3.connect(path);
+
 	for i in range(st, en, blocksize):
 		if( i % (blocksize) == 0): 
-			print(i,end=' ');
+			print(i,end='L ');
 			sys.stdout.flush();
-		d = pd.read_sql_query("select * from acttraj limit "+str(i)+","+str(blocksize),con);
-		# print(d);
-		for ind,f in d.iterrows():
-			end = min(f.start+f.length,1439)
-			#if( f.start < winmax and end > winmin):
-			slotst = int(np.floor(f.start/stepsize))
-			sloten = int(np.floor(end/stepsize))+1
-			# print(f.actcode,f.start,slotst,end,sloten)
-			for slot in range(int(slotst),int(sloten)):
-				# winmin = slot*stepsize; winmax = winmin + stepsize;
-				if(f.long <= regmaxlong and f.long >= regminlong and \
-				f.lat <= regmaxlat and f.lat >= regminlat):
-					locx,locy = reversetransraw(f.long,f.lat);
-					x,y = getgrid(locx,locy,gs,mindim);
-					# if(x >= 0 and x < xd and y >=0 and y < yd):
-					weight = min(end, winmax[slot]) - max(f.start,winmin[slot])
-					# print(weight)
-					if(f.actcode >= 180000 and f.actcode <=189999):
-						if(lastact[0] == f.actcode and lastact[1] == f.agentnum):
-							#speed limit - we assume max speed of 50 m/s 
-							if not(speedlimit(x,y,lastact[2],lastact[3],weight, 50.0)):
-								# mats[slot][2][x,y] += weight;
-							# else:
-								line = bresenham(x,y,lastact[2],lastact[3])[:-1];
-								cline = len(line)
-								for t in range(len(line)):
-									mats[slot][2][line[t][0],line[t][1]] += (weight / cline);
-						# else:
-							# mats[slot][2][x,y] += weight;
-					elif (f.actcode >= 50000 and f.actcode <=59999):
-						mats[slot][1][x,y] += weight;
-					else: 
-						mats[slot][0][x,y] += weight;
+		outblock = (en - i) if( (en - i) < blocksize ) else blocksize;
+		#outblock + 1 because we need overlap between frames for accuracy
+		d = pd.read_sql_query("select * from acttraj limit "+str(i)+","+str(outblock+1),con);
 
-					lastact = [f.actcode,f.agentnum,x,y]
-					
+		q.put(d);
+
 	con.close();
+
+def dosplit(df,threads,griddims,stepsize):
+	splittable = [];
+
+	size = len(df) - 1
+
+	splitsize = (size // threads) + 1
+
+	st = 0;
+	for i in range(threads):
+		en = np.minimum(st + splitsize + 1, len(df))
+		splittable += [(df[st:en],griddims,stepsize)]
+		st += splitsize;
+
+	return splittable;
+
+def parallelrunblock(threads, path, st, en, griddims, stepsize):
+
+	q = mp.Queue();
+	ch = mp.Process(target=chunker, args=(path,q,st,en));
+	ch.start();
+
+	p = mp.Pool(threads - 1);
+
+	xd,yd,gs,mindim = griddims;
+
+	mats = [];
+	steps = 1440 // stepsize;
+	for i in range(0, int(steps)):
+		
+		#res,work,trans
+		mats += [[scipy.sparse.bsr_matrix((xd,yd)), \
+			scipy.sparse.bsr_matrix((xd,yd)), \
+			scipy.sparse.bsr_matrix((xd,yd))]];
+
+
+	for i in range(st,en,blocksize):
+		if( i % (blocksize) == 0): 
+			print(i,end='R ');
+			sys.stdout.flush();
+
+		df = q.get();
+		splittable = dosplit(df,threads - 1, griddims, stepsize)
+		# print(splittable)
+		out = p.starmap(runblock,splittable);
+		# print(out)
+
+		for i in range(0,len(out)):
+			#bsrdmat = bsrify(out[i]);
+			for j in range(len(mats)):
+				for k in range(len(mats[j])):
+					mats[j][k] += out[i][j][k]
+
+	# print(mats)
 
 	return mats;
 
@@ -167,9 +267,9 @@ def plotmats(mats, maxvals, path, startind, stride=1,st=0,en=-1,nzscale=0.2):
 	for i in range(st,en,stride):
 		for j in range(len(mats[i])):
 			# print(i,j,i//stride)
-			submat = np.array(mats[i][j].todense())
+			submat = np.array(mats[i][j].todense()).T
 			
-			# outfile.create_dataset("/traj-slot-"+str(i)+"-set-"+str(j),data=mat,fillvalue=0.,compression='gzip',compression_opts=9)
+			# outfile.create_dataset("/traj-slot-"+str(i).zfill(3)+"-set-"+str(j).zfill(3),data=submat,fillvalue=0.,compression='gzip',compression_opts=9)
 			
 			# submat = np.log10(submat + 1)
 			submat[submat > 0.0] += (vmax[j] - submat[submat > 0.0])*0.2
@@ -179,8 +279,8 @@ def plotmats(mats, maxvals, path, startind, stride=1,st=0,en=-1,nzscale=0.2):
 			ax = plt.subplot(111)
 			ax.set_aspect(1.0)
 
-			ax.set_ylim(1300,2800)
-			ax.set_xlim(1300,2800)
+			ax.set_ylim(1200,3200)
+			ax.set_xlim(800,2800)
 			# print(maxval, np.argmax(mat)//yd, np.argmax(mat) % yd)
 			# ax = plt.subplot(i+1,j+1,xpl*ypl)
 			# ax.pcolormesh(submat,vmin=0.0,vmax=maxvals[j],cmap=plt.get_cmap('viridis'));
@@ -189,8 +289,9 @@ def plotmats(mats, maxvals, path, startind, stride=1,st=0,en=-1,nzscale=0.2):
 			F = plt.gcf();
 			F.set_size_inches(8,8)
 			F.set_dpi(300.0);
-			F.savefig(str(path)+"slot-"+str(i+startind)+"-set-"+str(j)+".png",dpi=300);
+			F.savefig(str(path)+"slot-"+str(i+startind).zfill(2)+"-set-"+str(j).zfill(2)+".png",dpi=300);
 			plt.clf()
+	# outfile.close();
 
 
 def parallelplotmats(threads,mats,maxvals,path,nzscale=0.2):
@@ -198,6 +299,7 @@ def parallelplotmats(threads,mats,maxvals,path,nzscale=0.2):
 	size = len(mats)
 	split = size // threads;
 	# print(split)
+
 
 	for i in range(threads):
 		splittable += [(mats[i*split:(i+1)*split],maxvals,path,i*split)]
@@ -207,10 +309,22 @@ def parallelplotmats(threads,mats,maxvals,path,nzscale=0.2):
 	p = mp.Pool(threads);
 	out = p.starmap(plotmats,splittable);
 
+	outfile = h5py.File(path+".h5");
 
-def main():
+	for i in range(len(mats)):
+		for j in range(len(mats[i])):
+			submat = np.array(mats[i][j].todense())
+			ds = outfile.create_dataset("/traj-slot-"+str(i).zfill(3)+"-set-"+str(j).zfill(3),data=submat,fillvalue=0.,compression='gzip',compression_opts=9)
+			ds.attrs['grid'] = gridsize
+			ds.attrs['time'] = i * timesplit
+			ds.attrs['length'] = timesplit
+			ds.attrs['timeunit'] = "minutes"
 
-	threads = 2;
+	outfile.close();
+
+def main(threads):
+
+	# threads = 2;
 
 	print("Start:",datetime.datetime.now().time().isoformat());
 
@@ -221,8 +335,6 @@ def main():
 	maxrow = int(pd.read_sql_query("select count(1) from acttraj", con).iloc[0,0]);
 	print("Maxrows:",maxrow);
 	# maxrow = 200
-
-
 	con.close();
 
 	print("Matpop:", datetime.datetime.now().time().isoformat());
@@ -241,13 +353,15 @@ def main():
 	griddims = (xd,yd,gridsize,mindim)
 	print("Gridsize: ",griddims)
 
-	mats = runblock(path,0,maxrow,griddims,timesplit);
+	# mats = runblock(path,0,maxrow,griddims,timesplit);
+	mats = parallelrunblock(threads, path,0,maxrow,griddims,timesplit);
 
 	print("")
 	print("Post build + Plotting:",datetime.datetime.now().time().isoformat());
 
 	# mats = mergemats(mats)
-	mats,maxvals = bsrifywmax(mats);
+	# mats,maxvals = bsrifywmax(mats);
+	maxvals = wmax(mats);
 
 	steps = int(np.floor(1440/timesplit))
 
@@ -268,10 +382,12 @@ def main():
 
 	# plt.show();
 	# plotmats(mats,maxvals,path,stride=1);
-	parallelplotmats(4,mats,maxvals,path)
+	parallelplotmats(threads,mats,maxvals,path)
 
 	print("Done:",datetime.datetime.now().time().isoformat());
 	
 
 if __name__ == "__main__":
-	main();
+	threads = mkl.get_max_threads();
+	# threads = 8;
+	main(threads)

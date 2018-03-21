@@ -577,7 +577,7 @@ def mangletrips(fr,frame):
 		locnx,locny = latlongtransraw(locnx,locny);
 
 		trdf,dur = gettrip(locpx,locpy,locnx,locny);
-		if(type(trdf) != "NoneType"):
+		if(type(trdf) != type(None)):
 
 			trdf['actind']=381; #FIXME: need a better coding system here
 			trdf['actorder']=fr.loc[ind]['actorder']-1;
@@ -638,55 +638,60 @@ def buildseqv2(frame,wins,lens,jointprob,precede,whereprob, dropind,idx):
 	# actlist = wins[np.random.rand(winlen) < wins['prob'].values].copy(deep=True);
 
 
-	picks = [] 
+
 	#pick non-picked elements in the non-covered region with accompanying lengths up to three times until coverage is > 0.95
-	actlist = []
-	coverage = np.zeros((1440,))
-	allpicks = np.full(winlen,False)
-	for i in range(3):
 
-		covfrac = np.sum(coverage)/1440.0
-		print("Covfrac: ", i, " ", covfrac)
-		if(covfrac < 0.95):
-			minpoint = np.argmin(coverage);
-			maxpoint = 1440 - np.argmin(coverage[::-1])
-			#  [np.random.rand(winlen) < wins['prob'].values]
-			winselect = (wins['wmax'] >= minpoint) & (wins['wmin'] <= maxpoint) & np.invert(allpicks)
+	
+
+	actlist = wins.copy(deep=True);
+
+
+
+
+
+
+	# print(actlist)
+
+	
+
+		# covfrac = np.sum(coverage)/1440.0
+		# print("Covfrac: ", i, " ", covfrac)
+		# if(covfrac < 0.95):
+		# 	minpoint = np.argmin(coverage);
+		# 	maxpoint = 1440 - np.argmin(coverage[::-1])
+		# 	#  [np.random.rand(winlen) < wins['prob'].values]
+		# 	winselect = (wins['wmax'] >= minpoint) & (wins['wmin'] <= maxpoint) & np.invert(allpicks)
 			
-			picks += [winselect & (np.random.rand(winlen) < wins['prob'].values)]
-			allpicks = allpicks | picks[i]
-			print(minpoint, maxpoint)
-		else:
-			break;
+		# 	picks += [winselect & (np.random.rand(winlen) < wins['prob'].values)]
+		# 	allpicks = allpicks | picks[i]
+		# 	print(minpoint, maxpoint)
+		# else:
+		# 	break;
 		
 		
-		actlist += [wins[picks[i]].copy(deep=True)];
-		print(actlist[i]);
-		try:
-			if(len(actlist[i]) > 1):
-				actlist[i][['lmin','lmax','lavg','lstd','lhist']] = actlist[i].index.to_series().apply(picklen, args=(lens,jointprob));
-			
-				
-		except KeyError:
-			print("There was a keyerror on this iteration: ")
-			print(actlist, jointprob, lens);
-			return None;
+
+	try:
+		actlist[['lmin','lmax','lavg','lstd','lhist']] = actlist.index.to_series().apply(picklen, args=(lens,jointprob));	
+	except KeyError:
+		print("There was a keyerror on this iteration: ")
+		print(actlist, jointprob, lens);
+		return None;
 		
 
 		
 
-		for ind,df in actlist[i].iterrows():
-			coverage[df.wmin:(df.wmin+df.lmax)] = 1.0
+	# 	for ind,df in actlist[i].iterrows():
+	# 		coverage[df.wmin:(df.wmin+df.lmax)] = 1.0
 
-	coverage = np.reshape(coverage,(48,30))
-	covdist = np.sum(coverage,axis=1)/30
-	print(covdist)
+	# coverage = np.reshape(coverage,(48,30))
+	# covdist = np.sum(coverage,axis=1)/30
+	# print(covdist)
 
-	covfrac = np.sum(coverage)/1440.0
-	print("Covfrac: ", i, " ", covfrac)
-	print(actlist)
+	# covfrac = np.sum(coverage)/1440.0
+	# print("Covfrac: ", i, " ", covfrac)
+	# print(actlist)
 
-	actlist = pd.concat(actlist);
+	# actlist = pd.concat(actlist);
 	
 
 	# print(actlist)
@@ -704,9 +709,32 @@ def buildseqv2(frame,wins,lens,jointprob,precede,whereprob, dropind,idx):
 	actind = np.array(actlist.index);
 	actlist['precscore'] = precsort(actind,precede)
 	actlist = actlist.sort_values(['precscore','wavg','wmin','length','wmax',]);
+	
+
+	coverage = np.zeros((1440,))
+	actlist['picks'] = False
+	actlist['validwin'] = True
+	# for i in range(len(actlist)):
+	for i in range(3):
+
+		actlist['picks'] = actlist['picks'] | ((np.random.rand(len(actlist)) < actlist['prob'].values) & actlist['validwin']);
+
+
+		actlist['end'] = (actlist['length']*actlist['picks']).cumsum();
+
+		actlist['start'] = (actlist['end']*actlist['picks']) - actlist['length']
+		actlist['start'] = actlist.apply(lambda x: x.end if x.start < 0.0 else x.start, axis=1)
+
+		actlist['validwin'] = actlist.apply(lambda x: True if x.start <= x.wmax and x.start >= x.wmin else False,axis=1)
+
+		if( (actlist['lmax']*actlist['picks']).sum() > 1440):
+			break;
+
+	# print(actlist)
+	actlist = actlist[actlist['picks']]
+
 	actlist['actorder'] = np.arange(0,len(actlist)*2,2);
 
-	print(actlist)
 
 	actlist['locp'] = actlist.index.to_series().apply(lambda x: whereprob[x].sample(n=1,weights=whereprob[x]).index[0]).fillna(-1);
 	actlist['prevloc'] = actlist['locp'].shift(1).fillna(-1);
@@ -729,39 +757,44 @@ def buildseqv2(frame,wins,lens,jointprob,precede,whereprob, dropind,idx):
 	# actlist['length'] += np.floor(actlist['lweight'] * diff).fillna(1.0);
 
 	#CUMSUM IS WRONG; need window smearing that puts activities in their windows correctly
-	actlist['end'] = actlist['length'].cumsum();
-	actlist['start'] = actlist['end'] - actlist['length']
+
 	# actlist['start'] = actlist.apply(lambda x: x.wmin if x.start < x.wmin else x.start  , axis=1)
 	# actlist['end'] = actlist['start'] + actlist['length']
 
 	delta = 1440.0 - actlist['length'].sum()
-	print("delta: ", delta);
+	# print("delta: ", delta);
 	actlist['lmaxsmear'] = actlist['lmax'] - actlist['length']
-	actlist['lminsmear'] = actlist['length'] - actlist['lmin']
-	actlist['wminerror'] = np.abs(np.minimum(0.0,actlist['start'] - actlist['wmin'])) #haha bad joke	
-	actlist['wmaxerror'] = np.minimum(0.0,actlist['wmax'] - actlist['start'])
+	# actlist['lminsmear'] = actlist['length'] - actlist['lmin']
+	# actlist['wminerror'] = np.abs(np.minimum(0.0,actlist['start'] - actlist['wmin'])) #haha bad joke	
+	# actlist['wmaxerror'] = np.minimum(0.0,actlist['wmax'] - actlist['start'])
 
-	actlist['validwin'] = actlist.apply(lambda x: 1.0 if x.start <= x.wmax and x.start >= x.wmin else 0.0,axis=1)
+	actlist['lweight'] = actlist['lmaxsmear'] / actlist['lmaxsmear'].sum();
+	actlist['lweight'] = actlist.apply(lambda x: x.lweight if x.density > 0.0 else 0.0,axis=1)
 
-	if(delta > 0):
-		pass
-	else:
-		pass
-	
+	actlist['length'] += np.floor(actlist['lweight'] * delta).fillna(1.0);
+	# actlist['validwin'] = actlist.apply(lambda x: True if x.start <= x.wmax and x.start >= x.wmin else False,axis=1)
+	# actlist['validlen'] = actlist.apply(lambda x: True if x.length <= x.lmax and x.length >= x.lmin else False, axis=1);
+
+	actlist['end'] = actlist['length'].cumsum();
+	actlist['start'] = actlist['end'] - actlist['length']
 	
 	
 	
 	# actlist.iloc[len(actlist)-1]['end'] = 1439.0
-	print("sum lmaxsmear: ",actlist['lmaxsmear'].sum())
-	print("sum lminsmear: ",actlist['lminsmear'].sum())
-	print("sum length: ",actlist['length'].sum())
+	# print("sum lmaxsmear: ",actlist['lmaxsmear'].sum())
+	# print("sum lminsmear: ",actlist['lminsmear'].sum())
+	# print("sum length: ",actlist['length'].sum())
 	# print(actlist[actlist['density'] >= 0.0])
-	# print(actlist)
+	# print("window accuracy: ", actlist[actlist['density'] >= 0.0]['validwin'].sum()/len(actlist[actlist['density'] >= 0.0]))
+	# print(actlist[actlist['density'] >= 0.0][['actind','start','length','lweight','locp','validwin','validlen']])
 
 
 
 
-	actlist.drop(['wincount','winuniq','density','ref','prob','wmin','wmax','wavg','wstd','lmin','lmax','lavg','lstd','precscore','validwin','lhist','triporder','actorder','locp','prevloc','lminsmear','lmaxsmear','wminerror','wmaxerror'],axis=1,inplace=True) #lweight
+
+
+	actlist.drop(['wincount','winuniq','density','ref','prob','wmin','wmax','wavg','wstd','lmin','lmax','lavg','lstd','precscore','validwin','lhist','triporder','actorder','locp','prevloc','lmaxsmear','lweight','picks'],axis=1,inplace=True) #lweight
+
 
 	return actlist;
 
@@ -932,7 +965,7 @@ def runit(threads):
 	print("Threads:",threads)
 
 	limiter = ""
-	limiter = " limit 100";
+	# limiter = " limit 1000";
 	
 	print("loading...")
 
@@ -1076,7 +1109,7 @@ def runit(threads):
 
 if __name__ == '__main__':
 	threads = mkl.get_max_threads();
-	threads = 2;
+	# threads = 5;
 	runit(threads - 1)
 
 

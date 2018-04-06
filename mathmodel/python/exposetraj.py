@@ -3,7 +3,7 @@ import numpy as np;
 import sqlite3;
 import mkl;
 import multiprocessing as mp;
-import sysimport;
+import sys;
 import pyproj;
 import h5py;
 import matplotlib.pyplot as plt;
@@ -32,9 +32,8 @@ def getexp(df, slicemat):
 
 def processtraj(df):
 
-	exptraj = [];
-
-	time.sleep(5)
+	exptraj = np.zeros(96);
+	# print(df[0], " ",len(df[1]))
 
 	return exptraj;
 
@@ -57,15 +56,19 @@ def processtraj(df):
 
 def main(threads):
 
-	inpath = sys.argv[1];
+	# inpath = sys.argv[1];
 	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
+	path = datapath + "Ftraj4-2018-03-19_13-53-28-24116.merge.sqlite3"
 	con = sqlite3.connect(path);
 	
 	maxagent = int(pd.read_sql_query("select max(agentnum) from acttraj", con).iloc[0,0]);
 	st = 0; en = 10000;
-	df = pd.read_sql_query("select * from acttraj where agentnum >= "+str(st)+" and < "+str(en));
+	df = pd.read_sql_query("select * from acttraj where agentnum >= "+str(st)+" and agentnum < "+str(en), con);
+
+	print(len(df))
 
 	con.close();
+
 
 	exptraj = []
 
@@ -73,18 +76,20 @@ def main(threads):
 	mats = []
 	#96 slots, 3 sets
 	matfile = h5py.File(datapath + "Ftraj4-2018-03-19_13-53-28-24116.merge.sqlite3.h5")
-	for i in range(0,96):
-		mats += [matfile["/traj-slot-" + str(i) + "-set-002"][:]]
+	for i in range(0,8):
+		print(i)
+		mats += [matfile["/traj-slot-" + str(i).zfill(3) + "-set-002"][:]]
 	matfile.close()
 
 	p = mp.Pool(processes=threads);
-
-	results = p.map(processtraj,df.groupby("agentnum"),chunksize=100)
+	g = df.groupby("agentnum")
+	print(len(g))
+	p.map(processtraj,g,chunksize=100)
 	
-	
+	p.close();
 
 
 if __name__ == "__main__":
 	threads = mkl.get_max_threads();
-	threads = 4;
+	threads = 8;
 	main(threads)

@@ -14,7 +14,7 @@ def funky(x):
 def main():
 	
 
-l
+
 	global bigarray;
 	bigarray = np.random.randn(100000000)
 	print("Bytes ", bigarray.nbytes);

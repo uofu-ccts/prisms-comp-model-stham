@@ -164,7 +164,7 @@ def runblock(frame, griddims, stepsize):
 						if not(speedlimit(x,y,lastact[2],lastact[3],weight, 50.0)):
 							# mats[slot][2][x,y] += weight;
 						# else:
-							line = bresenham(x,y,lastact[2],lastact[3])[:-1];
+							line = bresenham(x,y,lastact[2],lastact[3]);
 							cline = len(line)
 							for t in range(len(line)):
 								mats[slot][2][line[t][0],line[t][1]] += (weight / cline);
@@ -324,7 +324,7 @@ def parallelplotmats(threads,mats,maxvals,path,nzscale=0.2):
 
 def main(threads):
 
-	# threads = 2;
+	# threads = 8;
 
 	print("Start:",datetime.datetime.now().time().isoformat());
 
@@ -334,7 +334,7 @@ def main(threads):
 
 	maxrow = int(pd.read_sql_query("select count(1) from acttraj", con).iloc[0,0]);
 	print("Maxrows:",maxrow);
-	# maxrow = 200
+	# maxrow = 10000
 	con.close();
 
 	print("Matpop:", datetime.datetime.now().time().isoformat());

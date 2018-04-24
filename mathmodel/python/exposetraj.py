@@ -127,7 +127,7 @@ def processtraj(gframe):
 						if not(speedlimit(x,y,lastact[2],lastact[3],weight, 50.0)):
 							# mats[slot][2][x,y] += weight;
 						# else:
-							line = bresenham(x,y,lastact[2],lastact[3])[:-1];
+							line = bresenham(x,y,lastact[2],lastact[3]);
 							cline = len(line)
 							for t in range(len(line)):
 								exp[slot] += (weight / cline) * mats[slot][line[t][0],line[t][1]];

@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt;
 import pandas as pd;
 from scipy.signal import convolve;
 import datetime;
+import multiprocessing as mp;
 
 
 def metaconvolve(a,sten):

@@ -278,10 +278,10 @@ def locApply(x,frame,idx):
 	if(frame.empx == 0.0 and frame.empy == 0.0):
 		frame.empx,frame.empy = frame.addrx,frame.addry
 
-	if(x.locp in [12,13,14,15,16,17,18,19,20,21,99]):
-		_locp = x.prevloc;
-	else: 
-		_locp = x.locp;
+	# if(x.locp in [12,13,14,15,16,17,18,19,20,21,99]):
+	# 	_locp = x.prevloc;
+	# else: 
+	_locp = x.locp;
 
 
 	if(_locp == -1. or _locp == 1.):
@@ -543,35 +543,39 @@ def gettrip(lonx1,laty1,lonx2,laty2):
 
 def mangletrips(fr,frame):
 
+	if(len(fr) < 2): return fr;
 	
 	#trips = fr['locp'].isin([12,13,14,15,16,17,18,19,20,21,99]).index;
 	# trips = fr[fr['actind'] < 382][fr['actind'] > 313].index
-	trips = fr[fr['locp'] != fr['prevloc']].index
+	# trips = fr[fr['locp'] != fr['prevloc']].index
 	fintr = pd.DataFrame();
 
-	for ind in trips:
-		ploc = fr.index.get_loc(ind)-1
+
+	for ind in range(1,len(fr)):
+		ploc = ind - 1
 		if ploc < 0:
 			locpx, locpy = frame.addrx, frame.addry;
 		else:
 			locpx, locpy = fr.iloc[ploc][['locx','locy']]
 
-		nloc = fr.index.get_loc(ind)+1
-		if nloc >= len(fr):
-			locnx, locny = frame.addrx, frame.addry;
-		else:
-			locnx, locny = fr.iloc[nloc][['locx','locy']]
+		# nloc = fr.index.get_loc(ind) #+1
+		# if nloc >= len(fr):
+		# 	locnx, locny = frame.addrx, frame.addry;
+		# else:
+		locnx, locny = fr.iloc[ind][['locx','locy']]
 
+		#FIXME: probably need to have a minimum distance limiter here to prevent weird micro trips
+		#how to guarantee that a trip has proper road egress (e.g., how to prevent walking off of a freeway?)
 		if (locpx == locnx) and (locpy == locny):
 			continue;
 
-		fr.loc[ind]['locx'] = locpx;
-		fr.loc[ind]['locy'] = locpy;
-		act = fr.loc[ind]['actind']
+		# fr.loc[ind]['locx'] = locpx;
+		# fr.loc[ind]['locy'] = locpy;
+		act = fr.iloc[ind]['actind']
 		# low = fr.loc[ind]['start']
 		# high = fr.loc[ind]['end']
-		pr = fr.loc[ind]['prevloc']
-		loc = fr.loc[ind]['locp']
+		# pr = fr.loc[ind]['prevloc']
+		loc = fr.iloc[ind]['locp']
 
 		locpx,locpy = latlongtransraw(locpx,locpy);
 		locnx,locny = latlongtransraw(locnx,locny);
@@ -580,7 +584,7 @@ def mangletrips(fr,frame):
 		if(type(trdf) != type(None)):
 
 			trdf['actind']=381; #FIXME: need a better coding system here
-			trdf['actorder']=fr.loc[ind]['actorder']-1;
+			trdf['actorder']=fr.iloc[ind]['actorder']-1;
 			# trdf['start']=trdf['length'].cumsum()+low;
 			# trdf['end']=trdf['start']+trdf['length']
 			# trdf['start']=trdf['start'].apply(lambda x: 1440.0 if x > 1440.0 else x)

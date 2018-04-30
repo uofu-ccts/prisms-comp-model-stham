@@ -9,6 +9,10 @@ for f in "$@"
 do
 	date
 	ls -lh $f
-	sqlite3 $NEWDB "attach '$f' as tmerge; begin; insert into acttraj select * from tmerge.acttraj; commit; detach tmerge;"
+	sqlite3 $NEWDB "attach '$f' as tmerge; begin; insert into acttraj (\`index\`, length, start, long, lat, agentnum, actcode, day, day365) select \`index\`,length,start,long,lat,agentnum,actcode,day,day365 from tmerge.acttraj; commit; detach tmerge;"
 done
 date
+
+
+
+

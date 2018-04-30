@@ -140,7 +140,7 @@ g = df.groupby("agentnum")
 
 
 for ind,gf in g:
-	print(gf[(gf['y'] < 1952) & (gf['y'] > 1938) & (gf['x'] > 1892) & (gf['x'] < 1906)][['x','y','length']])
+	print(gf[(gf['y'] < 1952) & (gf['y'] > 1934) & (gf['x'] > 1892) & (gf['x'] < 1906)][['x','y','length']])
 	for ind2,gfr in gf[:-1].iterrows():
 		# print(gfr)
 		# if(gfr['y'] < 1952 and gfr['y'] > 1938 and gfr['x'] > 1892 and gfr['x'] < 1906):
@@ -154,6 +154,8 @@ for ind,gf in g:
 		else:
 			# line = bresenham(gfr.x,gfr.y,gfr.nx,gfr.ny)
 			line = splitline(gfr.x,gfr.y,gfr.nx,gfr.ny,1.0)
+			if((gfr['y'] < 1952) & (gfr['y'] > 1934) & (gfr['x'] > 1892) & (gfr['x'] < 1906)):
+				print(line)
 			for i in line:
 				# print(i)
 				# print(i)

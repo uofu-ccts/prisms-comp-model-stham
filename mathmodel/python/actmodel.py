@@ -903,7 +903,7 @@ def parallelapplyfunc(splittable, grid, tables, day, outpath, ttt):
 
 		#print('s',superor,supershape)
 		
-		con = sqlite3.connect(outpath + '/Ftraj'+str(day)+ttt+"-"+str(mp.current_process().pid)+'.sqlite3');
+		con = sqlite3.connect(outpath + '/Ftraj'+str(day)+ttt+"-"+str(mp.current_process().name)+'.sqlite3');
 
 		for i in range(0,splittable.shape[0]):
 			traj = gridsum(splittable.iloc[i], grid, tables, day,idx);

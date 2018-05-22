@@ -145,6 +145,9 @@ def processtraj(gframe):
 	winmin = np.arange(0,1440,stepsize)
 	winmax = winmin + stepsize
 
+	xd,yd = mats[0].shape
+
+
 	# x,y = 0,0
 	# if(frame.iloc[0].long <= regmaxlong and frame.iloc[0].long >= regminlong and \
 	# frame.iloc[0].lat <= regmaxlat and frame.iloc[0].lat >= regminlat):
@@ -170,8 +173,7 @@ def processtraj(gframe):
 		# print(f.actcode,f.start,slotst,end,sloten)
 		for slot in range(int(slotst),int(sloten)):
 			# winmin = slot*stepsize; winmax = winmin + stepsize;
-			if(f.long <= regmaxlong and f.long >= regminlong and \
-			f.lat <= regmaxlat and f.lat >= regminlat):
+			if( (f.x >= 0.0)& (f.y >= 0.0) & (f.x < xd) & (f.y < yd) & (f.nx < xd) & (f.ny < yd)):
 				if(np.isnan(f.nx) or np.isnan(f.ny)):
 					exp[slot] += weight * mats[slot][int(np.floor(f.x)),int(np.floor(f.y))];
 				# locx,locy = reversetransraw(f.long,f.lat);
@@ -222,11 +224,16 @@ def main(threads):
 	path = datapath + "Ftraj4-2018-04-25_17-20-10-ForkPoolWorker-10.merge.sqlite3"
 	con = sqlite3.connect(path);
 	
-	# maxagent = int(pd.read_sql_query("select max(agentnum) from acttraj", con).iloc[0,0]);
+	maxagent = int(pd.read_sql_query("select max(agentnum) from acttraj", con).iloc[0,0]);
 	st = 0; en = 1000;
-	df = pd.read_sql_query("select * from acttraj where agentnum >= "+str(st)+" and agentnum < "+str(en), con);
+	print(maxagent)
 
-	print(len(df))
+	slist = tuple(np.random.choice(maxagent,size=en,replace=False))
+
+	# df = pd.read_sql_query("select * from acttraj where agentnum >= "+str(st)+" and agentnum < "+str(en), con);
+	df = pd.read_sql_query("select * from acttraj where agentnum in " + str(slist), con);
+
+	# print(len(df))
 
 	con.close();
 
@@ -236,29 +243,29 @@ def main(threads):
 	global mats;
 	mats = []
 	#96 slots, 3 sets
-	matfile = h5py.File(datapath + "diffusedvals.h5")
+	matfile = h5py.File(datapath + "newdiffusedvals.h5")
 	for i in range(0,96):
 		print(i)
-		mats += [matfile["/traj-slot-" + str(i).zfill(3) + "-set-002"][:]]
+		mats += [matfile["/traj-slot-" + str(i).zfill(3) + "-set-001"][:]]
 	matfile.close()
 
 	p = mp.Pool(processes=threads);
 	g = df.groupby("agentnum")
-	print(len(g))
+	# print(len(g))
 	out = p.map(processtraj,g,chunksize=100)
 	
 	p.close();
 
 	arr = np.concatenate(out);
-	outfile = h5py.File(datapath + "finalexptraj.h5")
+	outfile = h5py.File(datapath + "finalexptraj1.h5")
 	ds = outfile.create_dataset("/exptraj",data=arr,fillvalue=0.,compression='gzip',compression_opts=9)
 	outfile.close();
 
-	print("plotting")
-	for i in out: 
-		plt.plot(i,alpha=0.5,linewidth=0.1,color='k')
+	# print("plotting")
+	# for i in out: 
+	# 	plt.plot(i,alpha=0.5,linewidth=0.1,color='k')
 
-	plt.show();
+	# plt.show();
 
 
 

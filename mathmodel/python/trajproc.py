@@ -403,6 +403,21 @@ def plotmats(mats, maxvals, path, startind, stride=1,st=0,en=-1,nzscale=0.2):
 
 
 def parallelplotmats(threads,mats,maxvals,path,nzscale=0.2):
+
+
+	outfile = h5py.File(path+".h5");
+
+	for i in range(len(mats)):
+		for j in range(len(mats[i])):
+			submat = np.array(mats[i][j].todense())
+			ds = outfile.create_dataset("/traj-slot-"+str(i).zfill(3)+"-set-"+str(j).zfill(3),data=submat,fillvalue=0.,compression='gzip',compression_opts=9)
+			ds.attrs['grid'] = gridsize
+			ds.attrs['time'] = i * timesplit
+			ds.attrs['length'] = timesplit
+			ds.attrs['timeunit'] = "minutes"
+			ds.flush();
+	outfile.close();
+
 	splittable = [];
 	size = len(mats)
 	split = size // threads;
@@ -417,19 +432,6 @@ def parallelplotmats(threads,mats,maxvals,path,nzscale=0.2):
 	p = mp.Pool(threads);
 	out = p.starmap(plotmats,splittable);
 
-	outfile = h5py.File(path+".h5");
-
-	for i in range(len(mats)):
-		for j in range(len(mats[i])):
-			submat = np.array(mats[i][j].todense())
-			ds = outfile.create_dataset("/traj-slot-"+str(i).zfill(3)+"-set-"+str(j).zfill(3),data=submat,fillvalue=0.,compression='gzip',compression_opts=9)
-			ds.attrs['grid'] = gridsize
-			ds.attrs['time'] = i * timesplit
-			ds.attrs['length'] = timesplit
-			ds.attrs['timeunit'] = "minutes"
-
-	outfile.close();
-
 def main(threads):
 
 	# threads = 8;
@@ -443,7 +445,7 @@ def main(threads):
 	# maxrow = int(pd.read_sql_query("select count(1) from acttraj", con).iloc[0,0]);
 	# print("Maxrows:",maxrow);
 	maxagent = int(pd.read_sql_query("select max(agentnum) from acttraj", con).iloc[0,0]);
-	# maxagent = 10
+	# maxagent = 100
 	print(maxagent)
 	con.close();
 

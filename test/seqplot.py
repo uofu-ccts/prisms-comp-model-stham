@@ -44,6 +44,7 @@ start = 0.0
 stop = 1.0
 number_of_lines=19
 cm_subsection = np.linspace(start, stop, number_of_lines)
+# np.random.shuffle(cm_subsection)
 maincolors = [ cm.prism(x) for x in cm_subsection ]
 colors = []
 for i in actmapping:
@@ -118,10 +119,17 @@ def plotseq(frame):
 	#print(cn);
 
 	ax.set_xlim((0.,24.))
-	ax.set_ylim((cneg,cpos))
+	ax.set_xticks((0,6,12,18,24))
+	ax.set_xticklabels(("4:00", "10:00", "16:00", "22:00","4:00"))
+	ax.set_yticks(());
+	# ax.set_ylim((cneg,cpos))
+	ax.set_ylim(-24.0,0.0)
+	ax.set_aspect(1.0)
+
 	plt.show()
 	# plt.show()
 
 for g,frame in acttable.groupby('daytypelabelreduce'):
-	print(g,len(frame))
-	plotseq(frame);
+	if(g == 11):
+		print(g,len(frame))
+		plotseq(frame);

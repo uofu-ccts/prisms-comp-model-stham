@@ -164,7 +164,8 @@ for g,df in gout:
 	
 
 
-	dfcount = np.sum(df['probemploy'] > 0.0);
+	# dfcount = np.sum(df['probemploy'] > 0.0);
+
 	#print(df)
 	if(g in odout.indices):
 		
@@ -179,12 +180,15 @@ for g,df in gout:
 			counter[int(i[0])] = int(i[1]);
 		wlist = list(counter.elements())
 		
-		np.random.shuffle(wlist);
+		
+		# np.random.shuffle(wlist);
+
 		
 		#maxnum = len(df) if len(odg) > len(df) else len(odg)
-		maxnum = dfcount if len(odg) > dfcount else len(odg);
+		# maxnum = dfcount if len(odg) > dfcount else len(odg);
 		#print('maxnum: ',maxnum);
-		out.loc[df.index[:maxnum],['empblock']] = wlist[:maxnum];
+		# out.loc[df.index[:maxnum],['empblock']] = wlist[:maxnum];
+		out.loc[df.index,['empblock']] = np.random.choice(wlist);
 		#print(out.iloc[df.index])
 
 # 	c+=1;
@@ -197,13 +201,13 @@ gout = out.groupby(['empblock'])
 bgroup = blockaddr.groupby(['block'])
 
 def pickemployclass(x,bg,wg,hw,young,old,shiftbracket,shiftp):
-	if(x['empblock'] != -1):
-		sz = len(bg)
-		pick = np.random.randint(0,sz);
-		x['empx'] = bg.iloc[pick]['addrx']
-		x['empy'] = bg.iloc[pick]['addry']
-		x['empcode'] = np.random.choice(20,p=wg);
-
+	
+	sz = len(bg)
+	pick = np.random.randint(0,sz);
+	x['empx'] = bg.iloc[pick]['addrx']
+	x['empy'] = bg.iloc[pick]['addry']
+	x['empcode'] = np.random.choice(20,p=wg);
+	if(x['probemploy'] == 1.0):
 		p = young;	
 		if(x['age'] >= 65): p = old;
 

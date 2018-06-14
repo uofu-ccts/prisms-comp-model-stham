@@ -69,7 +69,7 @@ def iterate(arr, dep, steps, stencil, pool=None):
 	return arr;
 
 def runit(threads):
-	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
+	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/bmi-group1/prism/run03/"
 
 	steps = (time * 60) // dt
 	stencil = np.array([1,-2,1]) / 4.0
@@ -82,7 +82,7 @@ def runit(threads):
 	outfile = h5py.File(datapath + "newdiffusedvals.h5")
 	for n in range(3):
 		print("loading: ", datetime.datetime.now().time().isoformat())
-		matfile = h5py.File(datapath + "Ftraj4-2018-04-25_17-20-10-ForkPoolWorker-10.merge.sqlite3.h5")
+		matfile = h5py.File(datapath + "Ftraj4-2018-05-25_16-19-35-ForkPoolWorker-10.merge.sqlite3.h5")
 		mats = []
 		for i in range(0,steplim):
 			mats += [matfile["/traj-slot-" + str(i).zfill(3) + "-set-"+str(n).zfill(3)][:]]

@@ -287,7 +287,11 @@ def locApply(x,frame,idx):
 	if(_locp == -1. or _locp == 1.):
 		return pd.Series([frame.addrx,frame.addry]);
 	elif(_locp == 2.):
-		return pd.Series([frame.empx, frame.empy]);
+		if(frame.emphours > 0):
+			return pd.Series([frame.empx, frame.empy]);
+		else:
+			#we assert a person who isn't employed
+			return pd.Series([frame.addrx, frame.addry]);
 	# elif(_locp == 8.):
 	# 	if frame.schoollevel == 0. : grid = 3500.0
 	# 	if frame.schoollevel == 1. : grid = 1000.0
@@ -966,6 +970,7 @@ def parallelapplydist(threads, table, grid, tables, day, outpath, ttt):
 def runit(threads):
 	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
 	
+
 	print("Threads:",threads)
 
 	limiter = ""

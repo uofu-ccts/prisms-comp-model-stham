@@ -220,35 +220,43 @@ def runblock(frames, griddims, stepsize):
 				# winmin = slot*stepsize; winmax = winmin + stepsize;
 				# if(f.long <= regmaxlong and f.long >= regminlong and \
 				# f.lat <= regmaxlat and f.lat >= regminlat):
-				if( (f.x >= 0.0)& (f.y >= 0.0) & (f.x < xd) & (f.y < yd) & (f.nx < xd) & (f.ny < yd)):
-					# locx,locy = reversetransraw(f.long,f.lat);
-					# x,y = getgrid(locx,locy,gs,mindim);
-					# x,y = altgetgrid(locx,locy,gs,mindim);
-					# if(x >= 0 and x < xd and y >=0 and y < yd):
+				if( (f.x >= 0.0)& (f.y >= 0.0) & (f.x < xd) & (f.y < yd)):
 					weight = min(end, winmax[slot]) - max(f.start,winmin[slot])
-					# print(weight)
-					if(f.actcode >= 180000 and f.actcode <=189999):
-						if(np.isnan(f.nx) or np.isnan(f.ny)):
-							mats[slot][2][int(np.floor(f.x)),int(np.floor(f.y))] += weight
-							continue;
-						# if(lastact[0] == f.actcode and lastact[1] == f.agentnum):
-							#speed limit - we assume max speed of 50 m/s 
-						# if not(speedlimit(f.x,f.y,f.nx,f.ny,weight, 50.0)):
-							# mats[slot][2][x,y] += weight;
-						# else:
-							# line = bresenham(f.x,f.y,f.nx,f.ny);
-						line = splitline(f.x,f.y,f.nx,f.ny)
-						# if((f['y'] < 1939) & (f['y'] > 1932) & (f['x'] > 1890) & (f['x'] < 1895)):
-							# print(line)
-						# cline = len(line)
-						for t in range(len(line)):
-							mats[slot][2][line[t][0],line[t][1]] += weight * line[t][2];
-						# else:
-							# mats[slot][2][x,y] += weight;
-					elif (f.actcode >= 50000 and f.actcode <=59999):
-						mats[slot][1][int(np.floor(f.x)),int(np.floor(f.y))] += weight;
-					else: 
-						mats[slot][0][int(np.floor(f.x)),int(np.floor(f.y))] += weight;
+					if((f.nx < xd) & (f.ny < yd)):
+						# locx,locy = reversetransraw(f.long,f.lat);
+						# x,y = getgrid(locx,locy,gs,mindim);
+						# x,y = altgetgrid(locx,locy,gs,mindim);
+						# if(x >= 0 and x < xd and y >=0 and y < yd):
+						
+						# print(weight)
+						if(f.actcode >= 180000 and f.actcode <=189999):
+							if(np.isnan(f.nx) or np.isnan(f.ny)):
+								mats[slot][2][int(np.floor(f.x)),int(np.floor(f.y))] += weight
+								continue;
+							# if(lastact[0] == f.actcode and lastact[1] == f.agentnum):
+								#speed limit - we assume max speed of 50 m/s 
+							# if not(speedlimit(f.x,f.y,f.nx,f.ny,weight, 50.0)):
+								# mats[slot][2][x,y] += weight;
+							# else:
+								# line = bresenham(f.x,f.y,f.nx,f.ny);
+							line = splitline(f.x,f.y,f.nx,f.ny)
+							# if((f['y'] < 1939) & (f['y'] > 1932) & (f['x'] > 1890) & (f['x'] < 1895)):
+								# print(line)
+							# cline = len(line)
+							for t in range(len(line)):
+								mats[slot][2][line[t][0],line[t][1]] += weight * line[t][2];
+							# else:
+								# mats[slot][2][x,y] += weight;
+						elif (f.actcode >= 50000 and f.actcode <=59999):
+							mats[slot][1][int(np.floor(f.x)),int(np.floor(f.y))] += weight;
+						else: 
+							mats[slot][0][int(np.floor(f.x)),int(np.floor(f.y))] += weight;
+					elif (np.isnan(f.nx) & np.isnan(f.ny)):
+						if (f.actcode >= 50000 and f.actcode <=59999):
+							mats[slot][1][int(np.floor(f.x)),int(np.floor(f.y))] += weight;
+						else: 
+							mats[slot][0][int(np.floor(f.x)),int(np.floor(f.y))] += weight;
+
 			# except IndexError:
 				# print(f.agentnum,ind,slot,f.x,f.y,f.nx,f.ny);
 						

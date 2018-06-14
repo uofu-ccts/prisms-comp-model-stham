@@ -69,18 +69,35 @@ def ageClip(x):
 
 mux['TEAGE'] = mergetab['age'].apply(ageClip);
 
-mux['TEHRUSL1'] = mergetab['emphours'];
+
+#this is a bug: tehrus can be -1, which reallyu throws a curve on a couple branches
+#in the 2015 ATUS dataset, only 9 respondents gave zero hours for work
+#therefore we can safely infer that anyone with 0 emphours is correctly classed
+#as TEHRUSL1 = -1, which matches edited universe notion of TELFS = 1 or 2
+mux['TEHRUSL1'] = mergetab['emphours'].apply(lambda x: -1 if x < 1 else x);
 
 
 def telfsClass(x):
 
 	if x.emphours > 0: return 1;
+	#the only real class that appears important besides 1 and 5 is 4 and 2; no easy way to infer
 	return 5;
 
 mux['TELFS'] = mergetab.apply(telfsClass,axis=1);
 
+#also wrong; teschenr is an edited universe with resp 15-49
+#this can probably be adjusted to 5-49 for the sake of accuracy
 
-mux['TESCHENR'] = mergetab['schoollevel'].apply(lambda x: 1 if x > -1 else 2);
+def teschenrClass(x):
+	if(x.age <= 49 and x.age >= 5):
+		return -1;
+	else: 
+		if(x.schoollevel > -1): 
+			return 1;
+		else: 
+			return 2;
+
+mux['TESCHENR'] = mergetab.apply(teschenrClass,axis=1);
 
 def teschftClass(x):
 	#full/part time is determined by 
@@ -88,12 +105,12 @@ def teschftClass(x):
 	#the probabilties are imputes from ATUS 2015 
 	#using counts of TESCHLVL, TELFS, and TESCHFT
 	if x.schoollevel == 3: #highschool
-		if x.emphours > 1:
+		if x.emphours >= 1:
 			return 1 if (0.87179) > np.random.random() else 2
 		else:
 			return 1 if (0.97772) > np.random.random() else 2
 	elif x.schoollevel == 4:
-		if x.emphours > 1: #college
+		if x.emphours >= 1: #college
 			return 1 if (0.52647) > np.random.random() else 2
 		else:
 			return 1 if (0.72000) > np.random.random() else 2
@@ -102,6 +119,8 @@ def teschftClass(x):
 mux['TESCHFT'] = mergetab.apply(teschftClass,axis=1);
 
 def teschlvlClass(x):
+	if x == 1: return 1;
+	if x == 2: return 1;
 	if x == 3: return 1;
 	if x == 4: return 2;
 	return -1;
@@ -150,8 +169,9 @@ def spouseapply(x):
 	if(x.spouse == -1):
 		return 3,-1,-1,-1
 	sppres = trsppresClass(x.age,x.agesp)
-	empnot = 1 if x.emphourssp > 0 else 2;
-	spuhrs = x.emphourssp
+	
+	empnot = (1 if x.emphourssp > 0 else 2) if sppres < 3 else -1;
+	spuhrs = -1 if x.emphourssp < 0 else x.emphourssp
 	spusft = 1 if x.emphourssp > 35 else 2;
 
 	return sppres,empnot,spuhrs,spusft;
@@ -174,7 +194,8 @@ for gr,df in householdg:
 	hhcounts[gr] = (child,eld);
 
 mux['TRCHILDNUM'] = mergetab['household'].apply(lambda x: hhcounts[x][0]);
-mux['TUELNUM'] = mergetab['household'].apply(lambda x: hhcounts[x][1]);
+mux['TUELNUM'] = mergetab['household'].apply(lambda x: hhcounts[x][1] if hhcounts[x][1] > 0 else -1);
+
 
 # 	mux.loc[df.index,['TRCHILDNUM']] = child;
 # 	mux.loc[df.index,['TUELNUM']] = eld;

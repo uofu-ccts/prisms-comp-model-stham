@@ -173,26 +173,28 @@ def processtraj(gframe):
 		# print(f.actcode,f.start,slotst,end,sloten)
 		for slot in range(int(slotst),int(sloten)):
 			# winmin = slot*stepsize; winmax = winmin + stepsize;
-			if( (f.x >= 0.0)& (f.y >= 0.0) & (f.x < xd) & (f.y < yd) & (f.nx < xd) & (f.ny < yd)):
-				if(np.isnan(f.nx) or np.isnan(f.ny)):
+			if( (f.x >= 0.0)& (f.y >= 0.0) & (f.x < xd) & (f.y < yd) ):
+				weight = min(end, winmax[slot]) - max(f.start,winmin[slot])
+				if(np.isnan(f.nx) & np.isnan(f.ny)):
 					exp[slot] += weight * mats[slot][int(np.floor(f.x)),int(np.floor(f.y))];
 				# locx,locy = reversetransraw(f.long,f.lat);
 				# x,y = getgrid(locx,locy,gridsize,mindim);
 				# if(x >= 0 and x < xd and y >=0 and y < yd):
-				weight = min(end, winmax[slot]) - max(f.start,winmin[slot])
+				
 				# print(weight)
-				if(f.actcode >= 180000 and f.actcode <=189999):
-					# if(lastact[0] == f.actcode and lastact[1] == f.agentnum):
-					# 	#speed limit - we assume max speed of 50 m/s 
-					# 	if not(speedlimit(x,y,lastact[2],lastact[3],weight, 50.0)):
-					# 		# mats[slot][2][x,y] += weight;
-					# 	# else:
-					line = splitline(f.x,f.y,f.nx,f.ny)
-					for t in range(len(line)):
-						exp[slot] += (weight * line[t][2]) * mats[slot][int(line[t][0]),int(line[t][1])];
+				elif((f.nx < xd) & (f.ny < yd)):
+					if(f.actcode >= 180000 and f.actcode <=189999):
+						# if(lastact[0] == f.actcode and lastact[1] == f.agentnum):
+						# 	#speed limit - we assume max speed of 50 m/s 
+						# 	if not(speedlimit(x,y,lastact[2],lastact[3],weight, 50.0)):
+						# 		# mats[slot][2][x,y] += weight;
+						# 	# else:
+						line = splitline(f.x,f.y,f.nx,f.ny)
+						for t in range(len(line)):
+							exp[slot] += (weight * line[t][2]) * mats[slot][int(line[t][0]),int(line[t][1])];
 
-				else: 
-					exp[slot] += weight * mats[slot][int(np.floor(f.x)),int(np.floor(f.y))];
+					else: 
+						exp[slot] += weight * mats[slot][int(np.floor(f.x)),int(np.floor(f.y))];
 
 				# lastact = [f.actcode,f.agentnum,x,y]
 
@@ -219,15 +221,17 @@ def processtraj(gframe):
 
 def main(threads):
 
-	# inpath = sys.argv[1];
-	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
-	path = datapath + "Ftraj4-2018-04-25_17-20-10-ForkPoolWorker-10.merge.sqlite3"
+	setselect = int(sys.argv[1]);
+	seed = int(sys.argv[2]);
+	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/bmi-group1/prism/run03/"
+	path = datapath + "Ftraj4-2018-05-25_16-19-35-ForkPoolWorker-10.merge.sqlite3"
 	con = sqlite3.connect(path);
 	
 	maxagent = int(pd.read_sql_query("select max(agentnum) from acttraj", con).iloc[0,0]);
-	st = 0; en = 1000;
+	st = 0; en = 100000;
 	print(maxagent)
 
+	np.random.seed(seed);
 	slist = tuple(np.random.choice(maxagent,size=en,replace=False))
 
 	# df = pd.read_sql_query("select * from acttraj where agentnum >= "+str(st)+" and agentnum < "+str(en), con);
@@ -246,7 +250,7 @@ def main(threads):
 	matfile = h5py.File(datapath + "newdiffusedvals.h5")
 	for i in range(0,96):
 		print(i)
-		mats += [matfile["/traj-slot-" + str(i).zfill(3) + "-set-001"][:]]
+		mats += [matfile["/traj-slot-" + str(i).zfill(3) + "-set-" + str(setselect).zfill(3)][:]]
 	matfile.close()
 
 	p = mp.Pool(processes=threads);
@@ -257,8 +261,9 @@ def main(threads):
 	p.close();
 
 	arr = np.concatenate(out);
-	outfile = h5py.File(datapath + "finalexptraj1.h5")
+	outfile = h5py.File(datapath + "finalexptraj-"+str(setselect)+".h5")
 	ds = outfile.create_dataset("/exptraj",data=arr,fillvalue=0.,compression='gzip',compression_opts=9)
+	ds = outfile.create_dataset("/slist",data=slist,compression='gzip',compression_opts=9)
 	outfile.close();
 
 	# print("plotting")
@@ -271,5 +276,5 @@ def main(threads):
 
 if __name__ == "__main__":
 	threads = mkl.get_max_threads();
-	threads = 8;
+	# threads = 8;
 	main(threads)

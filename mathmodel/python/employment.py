@@ -207,7 +207,7 @@ def pickemployclass(x,bg,wg,hw,young,old,shiftbracket,shiftp):
 	x['empx'] = bg.iloc[pick]['addrx']
 	x['empy'] = bg.iloc[pick]['addry']
 	x['empcode'] = np.random.choice(20,p=wg);
-	if(x['probemploy'] == 1.0):
+	if( x['probemploy'] > np.random.random() ):
 		p = young;	
 		if(x['age'] >= 65): p = old;
 

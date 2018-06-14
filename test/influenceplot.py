@@ -10,25 +10,33 @@ from itertools import repeat;
 
 
 
-def plot(i,path,vmax):
+def plot(i,path,prefix,vmax=None,percentile=99.9):
 # for i in range(0,96):
 	diffile = h5py.File(path,'r')
 	for j in range(3):
+
 		submat = diffile["/traj-slot-"+str(i).zfill(3)+"-set-"+str(j).zfill(3)][:][:].T
+
+		if(vmax is None):
+			_vmax = np.percentile(submat,percentile);
+		else:
+			_vmax = vmax
+
+
 		submat[submat < 0.0] = 0.0;
-		submat[submat > 0.0] += (vmax - submat[submat > 0.0]) * 0.05
+		submat[submat > 0.0] += (_vmax - submat[submat > 0.0]) * 0.05
 		ax = plt.axes([0.,0.,1.,1.])
 		ax.set_axis_off()
 		ax.set_aspect(1.0)
 		ax.set_ylim(1400,3000)
 		ax.set_xlim(1000,2600)
-		ax.pcolormesh(submat,vmin=0.0,vmax=vmax);
+		ax.pcolormesh(submat,vmin=0.0,vmax=_vmax);
 		# ax.pcolormesh(submat,vmin=0.0);
 		ax.text(0.05,0.05,str(((i//4)+4)%24).zfill(2)+":"+str(15*(i%4)).zfill(2),color='w',fontsize=18,transform=ax.transAxes)
 		F=plt.gcf()
 		F.set_size_inches(8,8)
 		# F.set_dpi(200.0)
-		F.savefig("outfigraw-slot-"+str(i).zfill(2)+"-set-"+str(j).zfill(3)+".png",dpi=200)
+		F.savefig(str(prefix)+str(i).zfill(2)+"-set-"+str(j).zfill(3)+".png",dpi=200)
 		plt.clf()
 
 	diffile.close();
@@ -45,7 +53,7 @@ def runit(threads):
 	# 	for j in range(3):
 	# 		vmax = np.maximum(np.max(diffile["/traj-slot-"+str(i).zfill(3)+"-set-"+str(j).zfill(3)][:][:]),vmax)
 	# print(vmax)
-	vmax = 50.00
+	# vmax = 50.00
 	# diffile.close()
 
 	p = mp.Pool(threads);

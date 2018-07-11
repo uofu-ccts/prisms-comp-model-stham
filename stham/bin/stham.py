@@ -1,6 +1,7 @@
+#!/usr/bin/env python
 # import configparser;
 import argparse;
-# import config
+import stham.config
 
 sthamversion = 'beta 0.1'
 
@@ -24,8 +25,9 @@ def main():
 
 	#run ini
 	#FIXME get dictionary
+	stham.config.testy()
 	#FIXME run model
-
+	
 
 
 

@@ -8,4 +8,4 @@ setup(name='stham',
       author_email='a.m.lund@utah.edu',
       license='Closed-source',
       packages=['stham'],
-      zip_safe=True)
+      zip_safe=False)

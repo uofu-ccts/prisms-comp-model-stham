@@ -1,6 +1,7 @@
-#!/usr/bin/env python
 # import configparser;
 import argparse;
+import stham
+import sys;
 import stham.config
 
 sthamversion = 'beta 0.1'
@@ -23,9 +24,11 @@ def main():
 		print("remember to modify path variables!")
 		return;
 
+	print(sys.version, sys.path)
+
 	#run ini
 	#FIXME get dictionary
-	stham.config.testy()
+	stham.config.test()
 	#FIXME run model
 	
 

@@ -19,7 +19,7 @@ def main():
 
 	#create default ini
 	if(args.gen):
-		#FIXME generate conf
+		stham.config.defaultconfig();
 		print("default configuration generated")
 		print("remember to modify path variables!")
 		return;
@@ -28,7 +28,7 @@ def main():
 
 	#run ini
 	#FIXME get dictionary
-	stham.config.test()
+
 	#FIXME run model
 	
 

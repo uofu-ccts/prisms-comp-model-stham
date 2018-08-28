@@ -102,9 +102,10 @@ def getrealcts(atrnum,date,tcounts):
 radlimit = 1
 for ind,fr in coords.iterrows():
 	
-	for i in np.arange(-radlimit,radlimit + 1):
-		for j in np.arange(-radlimit,radlimit + 1):
-			simcounts[ind] += count24(int(fr.x+i),int(fr.y+j),infile)
+	# for i in np.arange(-radlimit,radlimit + 1):
+	# 	for j in np.arange(-radlimit,radlimit + 1):
+	# 		simcounts[ind] += count24(int(fr.x+i),int(fr.y+j),infile)
+	simcounts[ind] += count24(int(fr.x),int(fr.y),infile)
 	c = 0;
 	for d in wdaydates:	
 		p = getrealcts(fr.atrnum,d,tcounts)
@@ -154,6 +155,10 @@ for ind,fr in coords.iterrows():
 	col = plart[0].get_color();
 	ax.plot(wendrealcounts[ind]/np.max(wendrealcounts[ind]),c=col,linestyle=':',color='r',linewidth=0.95,alpha=0.75)
 	ax.plot(wdayrealcounts[ind]/np.max(wdayrealcounts[ind]),c=col,linestyle='--',color='b',linewidth=0.95,alpha=0.75)
+	# plart = ax.plot(simcounts[ind],label=str(fr.atrnum),color='k',linewidth=0.95,alpha=0.75)
+	# col = plart[0].get_color();
+	# ax.plot(wendrealcounts[ind],c=col,linestyle=':',color='r',linewidth=0.95,alpha=0.75)
+	# ax.plot(wdayrealcounts[ind],c=col,linestyle='--',color='b',linewidth=0.95,alpha=0.75)
 # plt.legend()
 plart = mlines.Line2D([], [], color='k',linewidth=0.95, alpha=0.75)
 rplart = mlines.Line2D([], [], color='r',linestyle=':',linewidth=0.95, alpha=0.75)
@@ -168,7 +173,7 @@ legart = [plart,bplart,rplart]
 leglabels = [ "Sim", "Wday", "Wend" ]
 ax.legend(handles=legart,labels=leglabels)
 plt.tight_layout()
-# plt.show()
-plt.savefig('trafficcompare.eps',dpi = 300)
+plt.show()
+# plt.savefig('trafficcompare.eps',dpi = 300)
 
 

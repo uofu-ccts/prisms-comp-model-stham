@@ -62,30 +62,34 @@ for i in tags:
 
 coords = np.array(coords).reshape((len(tags),2)).T;
 coords = pd.DataFrame({"atrnum":tags,"lat":coords[0],"long":coords[1]})
-coords[['locx','locy']] = coords[['long','lat']]
-coords[['locx','locy']] = coords[['locx','locy']].apply(reversetrans,axis=1)
-coords['x'] = coords['locx'].apply(lambda x: int(np.floor((x - mindim[0])/gridsize)))
-coords['y'] = coords['locy'].apply(lambda x: int(np.floor((x - mindim[1])/gridsize)))
+# coords[['locx','locy']] = coords[['long','lat']]
+# coords[['locx','locy']] = coords[['locx','locy']].apply(reversetrans,axis=1)
+# coords['x'] = coords['locx'].apply(lambda x: int(np.floor((x - mindim[0])/gridsize)))
+# coords['y'] = coords['locy'].apply(lambda x: int(np.floor((x - mindim[1])/gridsize)))
 
-# print(coords);
-coords.to_csv(datapath + "atrvals.csv")
+print(coords);
+# coords.to_csv(datapath + "atrvals.csv")
 
-exit()
+
+modcoords = pd.read_csv(datapath + "atrwaypoints.csv")
+print(modcoords)
+# exit()
 
 # infile = h5py.File(runpath + "Ftraj4-2018-05-25_16-19-35-ForkPoolWorker-10.merge.sqlite3.h5",'r')
 
-longdelta = 0.012 / 10
-latdelta = 0.009 / 10
-longdelta = 0.002
-latdelta = 0.002
+longdelta = 0.00002
+latdelta = 0.00002
 con = sqlite3.connect(runpath + "Ftraj4-2018-05-25_16-19-35-ForkPoolWorker-10.merge.sqlite3")
 
 for ind,fr in coords.iterrows():
-	data = pd.read_sql_query("select lat,long from acttraj where lat between " +str(fr.lat - latdelta) + " and " +str(fr.lat + latdelta) + " and long between " +str(fr.long - longdelta) + " and " +str(fr.long + longdelta) + " limit 10", con)
+	# plt.scatter(fr.long,fr.lat,s=30,c='k')
 
+for ind,fr in modcoords.iterrows():
+	data = pd.read_sql_query("select start,lat,long from acttraj where lat between " +str(fr.lat - latdelta) + " and " +str(fr.lat + latdelta) + " and long between " +str(fr.long - longdelta) + " and " +str(fr.long + longdelta) + " limit 10", con)
+
+	# plt.scatter(fr.long,fr.lat,s=30,c='r')
+	# plt.scatter(data.long.values,data.lat.values,s=5,c='b');
 	
-	plt.scatter(data.long.values,data.lat.values,s=10);
-	plt.scatter(fr.long,fr.lat,s=50)
 	# plt.show()
 
 con.close()

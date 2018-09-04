@@ -188,7 +188,7 @@ for g,df in gout:
 		# maxnum = dfcount if len(odg) > dfcount else len(odg);
 		#print('maxnum: ',maxnum);
 		# out.loc[df.index[:maxnum],['empblock']] = wlist[:maxnum];
-		out.loc[df.index,['empblock']] = np.random.choice(wlist);
+		out.loc[df.index,['empblock']] = np.random.choice(wlist,size=len(df));
 		#print(out.iloc[df.index])
 
 # 	c+=1;

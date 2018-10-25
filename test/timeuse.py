@@ -58,7 +58,8 @@ def demoActPlot(frame,labelcolumn,cutoff=0):
 	cms = np.linspace(stop, start, number_of_lines)
 	# cms = [ p[0],p[4],p[1],p[5],p[2],p[6],p[3] ]
 	hatchset = [ '', '////' , '\\\\\\\\', '||||' , '----' , '....' , '' , 'o' , 'O' , '.' , '*' ]
-	maincolors = [ cm.plasma(x) for x in cms ]
+	# maincolors = [ cm.plasma(x) for x in cms ]
+	maincolors = [ cm.viridis(x) for x in cms ]
 	colors = maincolors
 
 	# colors = []
@@ -90,7 +91,8 @@ def demoActPlot(frame,labelcolumn,cutoff=0):
 	#jg is for joingroup
 	c = 1
 	for jg in framegroup:
-		if jg[0] not in [24,37,53,76]:
+		# if jg[0] not in [24,37,53,76]:
+		if jg[0] not in [45,33,79,154]:
 			continue;
 		
 		if(labelscount[jg[0]] < cutoff):

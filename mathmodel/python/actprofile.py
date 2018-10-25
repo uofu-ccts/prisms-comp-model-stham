@@ -422,6 +422,10 @@ def determineLabels(frame, columns, name, path, cutoff = 50, eps=0.3, samples=10
 	labelframe[name+'labelrefit'] = refitlabels;
 
 	print("Relabeling sets with size <", cutoff, "...")
+	#### POSSIBLE MAJOR BUG
+	#### this section of code may mix up columns badly
+	#### alternate explanation is that joblib changed with anaconda
+	#### messing up the order of columsnb of values, or some such
 	reducedframe, reducedlabels = labelCutoff(subframe, refitlabels, cutoff);
 	relabelclf,reducedlabels=treeRefit(reducedframe.values,reducedlabels,depth=None, nest=2000);
 	reducedlabels = relabelclf.predict(vector);

@@ -275,8 +275,9 @@ def pickschool(x):
 def locApply(x,frame,idx):
 
 	# print(x,fr)
-	if(frame.empx == 0.0 and frame.empy == 0.0):
-		frame.empx,frame.empy = frame.addrx,frame.addry
+	# print(frame.addrx, frame.addry,frame.empx,frame.empy,frame.emphours,x.locp)
+	# if(frame.empx == 0.0 and frame.empy == 0.0):
+	# 	frame.empx,frame.empy = frame.addrx,frame.addry
 
 	# if(x.locp in [12,13,14,15,16,17,18,19,20,21,99]):
 	# 	_locp = x.prevloc;
@@ -635,7 +636,7 @@ def precsort(actind,precede):
 
 def buildseqv2(frame,wins,lens,jointprob,precede,whereprob, dropind,idx):
 	#start,end,length, actind
-
+	# print(frame)
 	winlen = len(wins)
 
 	
@@ -799,7 +800,7 @@ def buildseqv2(frame,wins,lens,jointprob,precede,whereprob, dropind,idx):
 
 
 
-
+	# print(actlist[["actind","actorder","locp","locx","locy"]])
 
 	actlist.drop(['wincount','winuniq','density','ref','prob','wmin','wmax','wavg','wstd','lmin','lmax','lavg','lstd','precscore','validwin','lhist','triporder','actorder','locp','prevloc','lmaxsmear','lweight','picks'],axis=1,inplace=True) #lweight
 
@@ -992,7 +993,7 @@ def runit(threads):
 	con = sqlite3.connect(datapath + "employ2.sq3");
 	employ = pd.read_sql("select * from employ" + limiter, con);
 	#id,empblock,empx,empy,empcode,emphours,empweeks,empshift,probemploy
-	keys = ['id','emphours']
+	keys = ['id']
 	for i in keys: employ[i] = employ[i].astype('uint32');
 	keys = ['empcode','empweeks','empshift']
 	for i in keys: employ[i] = employ[i].astype('int8');
@@ -1089,9 +1090,11 @@ def runit(threads):
 
 	# rawmat,x,y,traj = parallelapplyfunc(ptable.iloc[0:1000], 500.0,commontables, day )
 
+	# outpath = "/scratch/kingspeak/serial/u0403692/"
+	outpath = "/scratch/general/lustre/u0403692/"
 	#for day in range(1,8):
 	grid = 500.0
-	traj = parallelapplydist(threads, ptable, grid,commontables,day,datapath,ttt )
+	traj = parallelapplydist(threads, ptable, grid,commontables,day,outpath,ttt )
 	# traj['day'] = day;
 	# traj['day365']=1;
 	# traj[["locx","locy"]] = traj[["locx","locy"]].apply(latlongtrans,axis=1);

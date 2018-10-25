@@ -223,12 +223,12 @@ def main(threads):
 
 	setselect = int(sys.argv[1]);
 	seed = int(sys.argv[2]);
-	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/bmi-group1/prism/run03/"
-	path = datapath + "Ftraj4-2018-05-25_16-19-35-ForkPoolWorker-10.merge.sqlite3"
+	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/bmi-group1/prism/run05/"
+	path = datapath + "Ftraj4-2018-09-13_15-55-21-ForkPoolWorker-10.merge.sqlite3"
 	con = sqlite3.connect(path);
 	
 	maxagent = int(pd.read_sql_query("select max(agentnum) from acttraj", con).iloc[0,0]);
-	st = 0; en = 100000;
+	st = 0; en = 10000;
 	print(maxagent)
 
 	np.random.seed(seed);
@@ -247,7 +247,7 @@ def main(threads):
 	global mats;
 	mats = []
 	#96 slots, 3 sets
-	matfile = h5py.File(datapath + "newdiffusedvals.h5")
+	matfile = h5py.File(datapath + "diffusedvals.h5")
 	for i in range(0,96):
 		print(i)
 		mats += [matfile["/traj-slot-" + str(i).zfill(3) + "-set-" + str(setselect).zfill(3)][:]]
@@ -276,5 +276,5 @@ def main(threads):
 
 if __name__ == "__main__":
 	threads = mkl.get_max_threads();
-	# threads = 8;
+	threads = 8;
 	main(threads)

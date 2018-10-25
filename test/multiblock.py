@@ -203,7 +203,7 @@ def getseqs():
 	blocks = (490351031001017,490351034003013,490351032001002,490351033003005,490351031001018,490351032001000,490351034003016,490351031001013,490351031001015,490351034003012,490351031001012,490351031001010,490351031001014,490351031001011,490351032001003,490351032001004,490351032001005,490351032001006,490351034003009,490351033003003,490351033003004,490351033003002,490351031001016,490351032001001)
 
 	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
-	runpath = "/uufs/chpc.utah.edu/common/home/u0403692/bmi-group1/prism/run03/"
+	runpath = "/uufs/chpc.utah.edu/common/home/u0403692/bmi-group1/prism/run05/"
 
 	datacon = sqlite3.connect(datapath + "indvs2.sq3")
 	indvs = pd.read_sql_query("select * from indvs where block in " + str(blocks), datacon)
@@ -228,7 +228,7 @@ def getseqs():
 	# print(indvlabels);
 	# print(agentnums)
 	# exit()
-	runcon = sqlite3.connect(runpath + "Ftraj4-2018-05-25_16-19-35-ForkPoolWorker-10.merge.sqlite3")
+	runcon = sqlite3.connect(runpath + "Ftraj4-2018-09-13_15-55-21-ForkPoolWorker-10.merge.sqlite3")
 
 	seqs = pd.read_sql_query("select * from acttraj where agentnum in " + str(agentnums), runcon)
 	runcon.close();
@@ -268,9 +268,9 @@ def runit():
 		# plt.plot(exp[c],linewidth=0.5,alpha=0.5)
 		c += 1;
 	# plt.show();
-
-	outpath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
-	file = h5py.File(outpath + "pm25traj.h5",'w')
+	runpath = "/uufs/chpc.utah.edu/common/home/u0403692/bmi-group1/prism/run05/"
+	# outpath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
+	file = h5py.File(runpath + "pm25traj.h5",'w')
 	ds = file.create_dataset("/exppm25",data=exp,fillvalue=0.,compression='gzip',compression_opts=9)
 	file.close();
 	

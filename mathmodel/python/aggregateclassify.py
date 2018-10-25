@@ -17,6 +17,7 @@ datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
 print("loading...")
 
 limiter = ""
+# limiter = " limit 10000"
 
 con = sqlite3.connect(datapath + "indvs2.sq3");
 indvs = pd.read_sql("select * from indvs" + limiter, con);
@@ -227,6 +228,7 @@ out['id'] = mergetab['id']
 
 vals = mux[goodcols].values;
 
+# mux.to_csv(datapath + "mux.csv")
 
 labels = [];
 for i in range(0,len(vals),1000):
@@ -239,4 +241,5 @@ out['casetype'] = np.concatenate(labels);
 
 print("writing...")
 
+# out.to_csv(datapath + "muxlabels.csv")
 out.to_csv(datapath + "indvlabels.csv")

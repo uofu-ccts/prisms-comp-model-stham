@@ -9,7 +9,7 @@ import matplotlib.lines as mlines
 import sqlite3
 
 datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
-runpath = "/uufs/chpc.utah.edu/common/home/u0403692/bmi-group1/prism/run03/"
+runpath = "/scratch/general/lustre/u0403692/"
 
 gridsize = 100.0
 stepsize=15
@@ -94,12 +94,12 @@ regs = [];
 
 longdelta = 0.00002
 latdelta = 0.00002
-con = sqlite3.connect(runpath + "Ftraj4-2018-05-25_16-19-35-ForkPoolWorker-10.merge.sqlite3")
+con = sqlite3.connect(runpath + "Ftraj4-2018-09-13_15-54-07-ForkPoolWorker-10.merge.sqlite3")
 
 # for ind,fr in coords.iterrows():
 	# plt.scatter(fr.long,fr.lat,s=30,c='k')
 
-limiter = " limit 10"
+# limiter = " limit 1000"
 limiter = ""
 for ind,fr in modcoords.iterrows():
 	print(ind, fr.atr, end=" ",flush=True)

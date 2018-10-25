@@ -20,7 +20,7 @@ def plot(i,path,prefix,vmax=None,percentile=99.9):
 		if(vmax is None):
 			_vmax = np.percentile(submat,percentile);
 		else:
-			_vmax = vmax
+			_vmax = vmax[j]
 
 
 		submat[submat < 0.0] = 0.0;
@@ -36,28 +36,31 @@ def plot(i,path,prefix,vmax=None,percentile=99.9):
 		F=plt.gcf()
 		F.set_size_inches(8,8)
 		# F.set_dpi(200.0)
-		F.savefig(str(prefix)+str(i).zfill(2)+"-set-"+str(j).zfill(3)+".png",dpi=200)
+		F.savefig(str(prefix)+str(i).zfill(2)+"-set-"+str(j).zfill(3)+".png",dpi=400)
 		plt.clf()
 
 	diffile.close();
 
 
 def runit(threads):
-	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
+	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/bmi-group1/prism/run05/"
 	# fname = "newdiffusedvals.h5"
-	fname = "Ftraj4-2018-04-25_17-20-10-ForkPoolWorker-10.merge.sqlite3.h5"
+	fname = "diffusedvals.h5"
 
 	# diffile = h5py.File(datapath + fname,'r')
 	
-	# for i in range(96):
-	# 	for j in range(3):
-	# 		vmax = np.maximum(np.max(diffile["/traj-slot-"+str(i).zfill(3)+"-set-"+str(j).zfill(3)][:][:]),vmax)
+	# # vmax = [0.0,0.0,0.0]
+	# # for i in range(96):
+	# # 	for j in range(3):
+	# # 		vmax[j] = np.maximum(np.max(diffile["/traj-slot-"+str(i).zfill(3)+"-set-"+str(j).zfill(3)]),vmax[j])
 	# print(vmax)
-	# vmax = 50.00
+	# # vmax = 50.00
 	# diffile.close()
+	vmax = np.array([13405.668109490898, 18298.233604203473, 479.0284136004092])
+	vmax = vmax * 0.6
 
 	p = mp.Pool(threads);
-	p.starmap(plot,zip(np.arange(36,37),repeat(datapath + fname),repeat(vmax)),chunksize=12);
+	p.starmap(plot,zip([32,80],repeat(datapath + fname),repeat(datapath),repeat(vmax)),chunksize=12);
 	p.close();
 
 

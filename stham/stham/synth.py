@@ -18,22 +18,32 @@ def affexp(x,aff):
 	k = np.power(2,aff)
 	return np.power(2,x*k)/np.power(2,k)
 
-def rloc(x,y,r):
+
+def sqbox(t):
+	cs = np.cos(t); sn = np.sin(t);
+	div = np.maximum(np.abs(cs),np.abs(sn))
+	return cs / div, sn / div
+
+
+def rloc(x,y,r,setback=25):
+	scale = (r-setback)/r
 	s = np.random.random() * 2 * np.pi
 	cs = np.cos(s); sn = np.sin(s);
-	div = np.max(l
-	return x*r + xs*r, y*r + ys*r
+	div = max(np.abs(cs),np.abs(sn))
+	return (cs/div)*r*scale*0.5 + (x+0.5)*r, (sn/div)*r*scale*0.5 + (y+0.5)*r
 
 def genlocs(n = 1000, blocksize = 10,blockwidth = 100, majorroad = 10, density = 100, verticalprob = 0.10, mode='single', weights = None, affinity = 2.0, seed = None):
 	""" 
 	Creates an artificial list of locations
 	n - total number of locations to populate
+	blocksize - width of region in blocks
 	blockwidth - size of a block, meters
 	majorroad - number of blocks before a major roadway is built
 	density - maximum number of locations per block before vertical scaling test occurs
 	verticalprob - probability of additional vertical units being added at capacity
 	mode - single or inclusive zoning method
 	weights - relative weights of location types
+	affinity - affinity for an already populated block. affinity is the log of k, and should be between (-4,4) for good results
 	seed - RNG seed for the loc
 
 
@@ -68,7 +78,8 @@ def genlocs(n = 1000, blocksize = 10,blockwidth = 100, majorroad = 10, density =
 	# blocksize = int(np.floor(2*radius))+1
 	blocksize += 1
 
-	blocks = np.zeros((3,blocksize,blocksize)) #type,count,max
+	blocks = np.zeros((4,blocksize,blocksize)) #type,count,max,p
+
 
 	if(weights == None):
 		weights = [0.4,0.15,0.15,0.15,0.05,0.10]
@@ -80,7 +91,8 @@ def genlocs(n = 1000, blocksize = 10,blockwidth = 100, majorroad = 10, density =
 		blocks[2] = density
 		for i in range(0,blocksize,10):
 			blocks[0][i] = 6
-			blocks[0].T[i] = 6			
+			blocks[0].T[i] = 6	
+					
 
 		
 		locs[0] = np.random.choice(6,p=weights,size=n)
@@ -89,7 +101,8 @@ def genlocs(n = 1000, blocksize = 10,blockwidth = 100, majorroad = 10, density =
 			s = np.nonzero(blocks[0] == locs[0][i])
 			ms = len(s)
 			s = np.append(s,np.nonzero(blocks[0] == -1),axis=1)
-			p = affexp(blocks[2][s[0],s[1]] - blocks[1][s[0],s[1]],affinity)
+			# p = affexp(blocks[2][s[0],s[1]] - blocks[1][s[0],s[1]],affinity)
+			p = blocks[
 			p[ms:] *= 0.03
 			pick = np.random.choice(len(p),p=p/np.sum(p))
 			locs[1][i],locs[2][i] = rloc(s[0][pick],s[1][pick],blockwidth)
@@ -97,7 +110,7 @@ def genlocs(n = 1000, blocksize = 10,blockwidth = 100, majorroad = 10, density =
 			if(blocks[0][s[0][pick],s[1][pick]] == -1):
 				blocks[0][s[0][pick],s[1][pick]] = locs[0][i]
 
-			s = np.nonzero(blocks[1] == blocks[2])
+			s = np.nonzero(blocks[1] >= blocks[2])
 			blocks[2][s[0],s[1]] += density * (np.random.random(len(s[0])) < verticalprob)
 
 		print(blocks)
@@ -107,7 +120,8 @@ def genlocs(n = 1000, blocksize = 10,blockwidth = 100, majorroad = 10, density =
 		plt.pcolormesh(mxv,myv,blocks[0])
 		plt.scatter(locs[1],locs[2],s=10,c='r')
 		plt.axes().set_aspect(1.0);
-		plt.show()		
+		plt.show()
+		return locs	
 
 	elif mode == 'inclusive':
 		pass;
@@ -121,4 +135,4 @@ def genAgents(n):
 	pass;
 
 if __name__ == "__main__":
-	genlocs();
+	genlocs(n=2000,blocksize=100,affinity=1.0);

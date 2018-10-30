@@ -60,7 +60,7 @@ def dist(x0,y0,x1,y1):
 	return np.sqrt(dx*dx+dy*dy)
 
 
-def slurpLocs(file, target, aux, xyproj, meta=None, latlongproj='epsg:4326'):
+def loadLocs(file, target, aux, xyproj, meta=None, latlongproj='epsg:4326'):
 	"""
 	Converts a location input file to an sqlite3 format useable by STHAM
 	file - the input file to be converted

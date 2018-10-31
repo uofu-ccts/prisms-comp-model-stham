@@ -4,11 +4,26 @@ import matplotlib.pyplot as plt;
 
 
 
-def genActivities(n):
+def genAgents(n):
 	pass;
 
+def genActivities(n):
 
-	
+	#for each activity type
+
+		#who - self,hh,affiliate, what fraction
+
+		#when - typical activity length and window
+
+ 		#where - type for each context
+
+		#what - essential or elective, frequency halflife
+
+		#how - which context
+
+
+	pass;
+
 
 def genDemographics(n):
 	pass;
@@ -32,7 +47,21 @@ def rloc(x,y,r,setback=25):
 	div = max(np.abs(cs),np.abs(sn))
 	return (cs/div)*r*scale*0.5 + (x+0.5)*r, (sn/div)*r*scale*0.5 + (y+0.5)*r
 
-def genlocs(n = 1000, blocksize = 10,blockwidth = 100, majorroad = 10, density = 100, verticalprob = 0.10, mode='single', weights = None, affinity = 2.0, seed = None):
+def adjacent(blocks):
+	# roadmask = blocks == np.max(blocks)
+	mask = blocks >=0
+	out = np.zeros_like(blocks)
+	out[mask] = 1
+	# out[roadmask] = 0
+	stencil = np.array([1,1,1])
+	out = np.apply_along_axis(lambda x: np.convolve(x,stencil,mode='same'),axis=0,arr=out).T
+	out = np.apply_along_axis(lambda x: np.convolve(x,stencil,mode='same'),axis=0,arr=out).T
+	out[mask] = 0
+	# out[roadmask] = 0;
+	return np.nonzero(out > 0)
+
+
+def genlocs(n = 1000, blocksize = 10,blockwidth = 100, majorroad = 10, density = 100, verticalthresh = 0.95, mode='single', weights = None, affinity = 1.0, seed = None, types = None,emptyselect = 0.20,totalrand=0.01):
 	""" 
 	Creates an artificial list of locations
 	n - total number of locations to populate
@@ -72,67 +101,87 @@ def genlocs(n = 1000, blocksize = 10,blockwidth = 100, majorroad = 10, density =
 		np.random.seed(seed);
 		print("RNG:", seed)
 
-	types = ['Residential','Business','Commercial','Industrial','Institutional','Open','Roadway']
+	if(types == None):
+		types = ['Residential','Business','Commercial','Industrial','Institutional','Open']
+		#major roadway is implicitly last number
+	typecount = len(types)
 
 	# radius = n / density
 	# blocksize = int(np.floor(2*radius))+1
-	blocksize += 1
+	# blocksize += 1
 
-	blocks = np.zeros((4,blocksize,blocksize)) #type,count,max,p
+	blocks = np.zeros((3,blocksize,blocksize)) #type,count,max,p
 
 
 	if(weights == None):
-		weights = [0.4,0.15,0.15,0.15,0.05,0.10]
+		weights = [0.4,0.15,0.15,0.15,0.05,0.10] #weights of types
 
 	locs = np.zeros((3,n)) #type, x, y
 
-	if mode == 'single':
-		blocks[0] = -1
-		blocks[2] = density
-		for i in range(0,blocksize,10):
-			blocks[0][i] = 6
-			blocks[0].T[i] = 6	
-					
+	
+	blocks[0] = -1
+	blocks[2] = density				
 
+	
+	locs[0] = np.random.choice(typecount,p=weights,size=n)
+	locs[0][np.arange(typecount)] = np.arange(typecount);
+
+	for i in range(n):
+
+
+
+		maxdense = np.max(blocks[2])
+		s = 0;p = 0
+		if mode == 'single':
+			select = np.nonzero(blocks[0] == locs[0][i])
+		elif mode == 'inclusive':
+			select = np.nonzero(blocks[0] >= locs[0][i])
+
+		empty = np.nonzero(blocks[0] == -1)
+		emptyadj = adjacent(blocks[0])
 		
-		locs[0] = np.random.choice(6,p=weights,size=n)
-		locs[0][0:7] = np.arange(7);
-		for i in range(n):
-			s = np.nonzero(blocks[0] == locs[0][i])
-			ms = len(s)
-			s = np.append(s,np.nonzero(blocks[0] == -1),axis=1)
-			# p = affexp(blocks[2][s[0],s[1]] - blocks[1][s[0],s[1]],affinity)
-			p = blocks[
-			p[ms:] *= 0.03
-			pick = np.random.choice(len(p),p=p/np.sum(p))
-			locs[1][i],locs[2][i] = rloc(s[0][pick],s[1][pick],blockwidth)
-			blocks[1][s[0][pick],s[1][pick]] += 1
-			if(blocks[0][s[0][pick],s[1][pick]] == -1):
-				blocks[0][s[0][pick],s[1][pick]] = locs[0][i]
-
-			s = np.nonzero(blocks[1] >= blocks[2])
-			blocks[2][s[0],s[1]] += density * (np.random.random(len(s[0])) < verticalprob)
-
-		print(blocks)
 		
-		mesh = np.linspace(0,blocksize*blockwidth,blocksize+1)
-		mxv,myv = np.meshgrid(mesh,mesh)
-		plt.pcolormesh(mxv,myv,blocks[0])
-		plt.scatter(locs[1],locs[2],s=10,c='r')
-		plt.axes().set_aspect(1.0);
-		plt.show()
-		return locs	
+		# totalrand
+		if (len(empty[0]) > 0 and np.random.random() < totalrand) or i == 0:
+			if(len(select[0]) > 0):
+				s = np.append(select,empty,axis=1)
+			else:
+				s = empty;
+			p = np.ones_like(s[0])
+		# emptyselect
+		elif(len(empty[0]) > 0 and np.random.random() < emptyselect) or i < typecount:
+			s = emptyadj
+			p = np.ones_like(s[0])
+		# affinity
+		else:
+			s = select
+			p = affexp( blocks[1][s[0],s[1]] / maxdense ,affinity)
 
-	elif mode == 'inclusive':
-		pass;
 
-	else:
-		print("Invalid mode given for genlocs!");
-		return None
+		#select block
+		pick = np.random.choice(len(p),p=p/np.sum(p))
+		locs[1][i],locs[2][i] = rloc(s[0][pick],s[1][pick],blockwidth)
+		blocks[1][s[0][pick],s[1][pick]] += 1
+		if(blocks[0][s[0][pick],s[1][pick]] == -1):
+			blocks[0][s[0][pick],s[1][pick]] = locs[0][i]
+
+		#density fill			
+		s = np.nonzero(blocks[1] >= (blocks[2] * verticalthresh))
+		blocks[2][s[0],s[1]] += density * (np.random.random(len(s[0])) < 0.5)
+
+	return locs, blocks
+
+def plotlocs(locs,blocks,blockwidth=100):
+	blocksize = len(blocks[0])
+	mesh = np.linspace(0,blocksize*blockwidth,blocksize+1)
+	mxv,myv = np.meshgrid(mesh,mesh)
+	plt.pcolormesh(mxv,myv,blocks[0])
+	plt.scatter(locs[2],locs[1],s=10,c='r')
+	plt.axes().set_aspect(1.0);
+	plt.show()
 
 
-def genAgents(n):
-	pass;
 
 if __name__ == "__main__":
-	genlocs(n=2000,blocksize=100,affinity=1.0);
+	locs,blocks = genlocs(n=20000,blocksize=100,affinity=4.0);
+	plotlocs(locs,blocks)

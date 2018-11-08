@@ -1,32 +1,93 @@
 import pandas as pd;
 import numpy as np;
 import matplotlib.pyplot as plt;
+from collections import Counter;
 
-
+#enum for ptable
+ACTCOUNT = 0
+LENCOUNT = 1
+LENACTJOINTPROB = 2
+ACTWINS = 3
+LENWINS = 4
+LHIST = 5
+LBINS = 6
+LHISTLEN = 7
+ORDERPROB = 8
 
 def genAgents(n):
 	pass;
 
-def genActivities(n):
+def genActivities(n_acts, n_types,n_loctypes,contextlam = 3, maxlen = 0.5, maxlenab = 0.7, minload = 2.0,n_samples = 100):
 
-	#for each activity type
 
-		#who - self,hh,affiliate, what fraction
+	contexts = np.random.poisson(contextlam,size=n_acts)+1
+	m = np.sum(contexts);
+	counts = Counter({ind:c for ind,c in enumerate(contexts)})
+	maincode = np.array(list(counts.elements()))
+	mainfreq = np.random.pareto(2, size=m)
+	mainfreq = mainfreq/(np.max(mainfreq)*1.01)
 
-		#when - typical activity length and window
+	print(m)
 
- 		#where - type for each context
+	#length base distros
+	alpha_len = np.power(10,(np.random.randn(m)/2.0))
+	beta_len = np.power(10,(np.random.randn(m)/2.0))
+	maxlens = np.random.beta(maxlenab,maxlenab,size=m)*maxlen;
 
-		#what - essential or elective, frequency halflife
 
-		#how - which context
+	#start base distros
+	alpha_st = np.power(10,(np.random.randn(m)/2.0))
+	beta_st = np.power(10,(np.random.randn(m)/2.0))
 
+	loadweights = maxlens * mainfreq
+
+	ptable = []
+
+	for i in range(n_types):
+		picks = np.full(m,False);
+		for j in range(5):
+			picks = picks | (np.random.random(m) < mainfreq)
+			load = np.sum(loadweights[picks])
+			if (load > minload): break;
+		picks = np.nonzero(picks)[0]
+		print(load,len(picks))
+		print(picks)
+		samples = np.zeros((3,n_samples,len(picks))) #start, len, freq
+		pickprob = np.random.pareto(1, size=len(picks))
+		pickprob = pickprob/(np.max(pickprob)*1.01)
+		for j in range(n_samples):
+			samples[0][j][:] = np.random.beta(alpha_st[picks],beta_st[picks])
+			samples[1][j][:] = np.random.beta(alpha_len[picks],beta_len[picks])
+			samples[2][j][:] = (np.random.random(len(picks)) < pickprob ).astype(np.float64)
+			
+		
+
+		
+
+		if(i > 3) : break;
+
+
+	#who - self,hh,affiliate, what fraction
+
+	#when - typical activity length and window (fixed or flexible)
+
+	#where - type for each context
+
+	#what - essential, demographically essential or elective, frequency halflife
+
+	#how - which context
+
+
+
+	
+
+
+
+
+def genDemographics(n_demos,n_types):
 
 	pass;
-
-
-def genDemographics(n):
-	pass;
+	
 
 
 def affexp(x,aff):
@@ -183,5 +244,6 @@ def plotlocs(locs,blocks,blockwidth=100):
 
 
 if __name__ == "__main__":
-	locs,blocks = genlocs(n=20000,blocksize=100,affinity=4.0);
-	plotlocs(locs,blocks)
+	# locs,blocks = genlocs(n=20000,blockwidth=250,blocksize=100,affinity=0.0);
+	# plotlocs(locs,blocks,blockwidth=250)
+	genActivities(500,50,10);

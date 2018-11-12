@@ -5,6 +5,7 @@ from sklearn.manifold import TSNE
 from sklearn.externals import joblib;
 from sklearn.datasets import make_blobs;
 from collections import Counter;
+from multiprocessing import Pool;
 
 def treeRefit(vector, labels,depth=None,nest = 500):
 	new_maxleaf=None;
@@ -14,7 +15,7 @@ def treeRefit(vector, labels,depth=None,nest = 500):
 	
 	new_maxdepth = depth
 
-	clf = sklearn.ensemble.ExtraTreesClassifier(n_jobs=1,max_leaf_nodes=new_maxleaf,n_estimators=new_n_est,criterion='entropy',min_samples_split=new_split_size,min_samples_leaf=new_sample_size,max_depth=new_maxdepth);
+	clf = ExtraTreesClassifier(n_jobs=1,max_leaf_nodes=new_maxleaf,n_estimators=new_n_est,criterion='entropy',min_samples_split=new_split_size,min_samples_leaf=new_sample_size,max_depth=new_maxdepth);
 	
 	clf = clf.fit(vector,labels);
 	newlabels = clf.predict(vector);
@@ -28,11 +29,10 @@ def randoTrees(vector, depth=5, nest = 500):
 	n_est = nest
 	maxdepth = depth
 
-	clf = sklearn.ensemble.RandomTreesEmbedding(max_leaf_nodes=maxleaf,n_estimators=n_est,min_samples_split=split_size,min_samples_leaf=sample_size,max_depth=maxdepth,min_impurity_decrease=maximpure)
+	clf = RandomTreesEmbedding(max_leaf_nodes=maxleaf,n_estimators=n_est,min_samples_split=split_size,min_samples_leaf=sample_size,max_depth=maxdepth,min_impurity_decrease=maximpure)
 	clf = clf.fit(vector);
 	labels = clf.apply(vector);
 	return clf, labels;
-
 
 def tsneLabelFit(prox,perplex=10):
 	tsne = TSNE(n_components = 2,perplexity=perplex,early_exaggeration=10.0,verbose=2,metric='precomputed')
@@ -40,12 +40,10 @@ def tsneLabelFit(prox,perplex=10):
 	coords /= np.max(np.abs(coords));
 	return coords;
 
-
 def dbscanLabelFit(coords, eps = 0.05, samples = 10):
-	dbscan = sklearn.cluster.DBSCAN(eps = eps, min_samples= samples);
+	dbscan = DBSCAN(eps = eps, min_samples= samples);
 	dblabels = dbscan.fit_predict(coords);
 	return dblabels;
-
 
 def outerequal(x):
 	tcount = len(x[0]);
@@ -102,15 +100,17 @@ def stripUnlabelled(vector,labels):
 	return stripframe, striplabel;
 
 #FIXME need to split to that tsne happens and allows eps/samples to be determined 
-def determineCoords(vector, perplex=10,procs=4,nest=2000):
+def determineCoords(vector, perplex=30,procs=4,nest=2000):
 
 	# print("Initial random forest fitting...")
 	initclf, initlabels = randoTrees(vector,depth=5,nest=nest);
 	prox = proxMat(initlabels,procs=procs)
-	coords = tsneLabelFit(prox,perplex=perplex):
+	coords = tsneLabelFit(prox,perplex=perplex)
+
+	return coords;
 
 
-def genLabels(vector,xycoords, n_cutoff = 50, eps=0.3, samples=10,nest = 2000):
+def genLabels(vector,xycoords, n_cutoff = 25, eps=0.03, samples=20,nest = 2000):
 
 	initlabels = dbscanLabelFit(xycoords, eps = eps, samples = samples)
 
@@ -118,7 +118,7 @@ def genLabels(vector,xycoords, n_cutoff = 50, eps=0.3, samples=10,nest = 2000):
 	refitclf,refitlabels = treeRefit(stripvector, striplabels, depth=8, nest=nest);
 	refitlabels = refitclf.predict(vector);
 
-	reducedvector, reducedlabels = labelCutoff(vector, refitlabels, cutoff);
+	reducedvector, reducedlabels = labelCutoff(vector, refitlabels, n_cutoff);
 	reduceclf,reducedlabels=treeRefit(reducedvector,reducedlabels,depth=None, nest=nest);
 	reducedlabels = reduceclf.predict(vector);
 
@@ -130,17 +130,18 @@ def saveCLF(clf,path,name):
 
 
 def runtest():
-	print("Gen vectors...")
-	vector,truelabels = make_blobs(n_samples=1000,n_features=100,centers = 50,random_state=0);
+	print("Gen vectors with 10 labels...")
+	vector,truelabels = make_blobs(n_samples=1000,n_features=50,centers = 10,random_state=0)
+	print("True label counts: ",Counter(truelabels))
 
 	print("Getting coords...")
 	coords = determineCoords(vector,nest=250)
 
 	print("Reducing labels...")
 	labels,clf = genLabels(vector,coords,n_cutoff=5,nest=250)
-
-	print("Reduced label count: ",len(Counter(labels)))
-	print(labels)
+	labelcount = Counter(labels)
+	print("Total final label count: ", len(labelcount))
+	print("Reduced label counts: ",labelcount)
 
 	print("Testing CLF save...")
 	saveCLF(clf,"","test");

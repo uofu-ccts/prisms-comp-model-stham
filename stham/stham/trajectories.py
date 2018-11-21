@@ -1,29 +1,34 @@
 import pandas as pd;
 import numpy as np;
 import rtree;
+from enum import Enum
 
 
-#enum for ptable
-ACTCOUNT = 0
-LENCOUNT = 1
-LENACTJOINTPROB = 2
-ACTWINS = 3
-LENWINS = 4
-LHIST = 5
-LBINS = 6
-LHISTLEN = 7
-ORDERPROB = 8
+class PTe(Enum):
+	ACTCOUNT = 0
+	LENCOUNT = 1
+	LENACTJOINTPROB = 2
+	ACTWINS = 3
+	LENWINS = 4
+	LHIST = 5
+	LBINS = 6
+	LHISTLEN = 7
+	ORDERPROB = 8
+	WHEREPROB = 9
 
-#enum for ACTWINS
-ACTCODE = 0
-ACTPROB = 1
-WMIN = 2
-WMAX = 3
-WAVG = 4
-LENS = 5 #only in newtraj
-PREC = 6 #only in newtraj
-LMAX = 7 #only in newtraj
+class AWe(Enum):
+	ACTCODE = 0
+	ACTPROB = 1
+	WMIN = 2
+	WMAX = 3
+	WAVG = 4
+	LENS = 5 #only in newtraj
+	PREC = 6 #only in newtraj
+	LMAX = 7 #only in newtraj
 
+class LWe(Enum):
+	LMIN = 0
+	LMAX = 1
 
 
 
@@ -44,37 +49,35 @@ def precsort(precede):
 	
 	return np.sum(omat, axis=0);
 
-
-
 def buildtraj(agent, locs, ptab):
 	
-	lengths = np.zeros(ptab[ACTCOUNT])
-	lmaxv = np.zeros(ptab[ACTCOUNT])
-	for i in range(ptab[ACTCOUNT]):
-		lwinpick = np.random.choice(ptab[LENCOUNT],p=ptab[LENACTJOINTPROB][i])
-		lhistpick = np.random.choice(ptab[LHISTLEN],p=ptab[LHIST][lwinpick]
-		low = ptab[LBINS][lwinpick][lhistpick]
-		high = ptab[LBINS][lwinpick][lhistpick + 1]
+	lengths = np.zeros(ptab[PTe.ACTCOUNT])
+	lmaxv = np.zeros(ptab[PTe.ACTCOUNT])
+	for i in range(ptab[PTe.ACTCOUNT]):
+		lwinpick = np.random.choice(ptab[PTe.LENCOUNT],p=ptab[PTe.LENACTJOINTPROB][i])
+		lhistpick = np.random.choice(ptab[PTe.LHISTLEN],p=ptab[PTe.LHIST][lwinpick])
+		low = ptab[PTe.LBINS][lwinpick][lhistpick]
+		high = ptab[PTe.LBINS][lwinpick][lhistpick + 1]
 		lengths[i] = np.random.rand() * (high-low) + low
-		lmaxv[i] = ptab[LENWINS][lwinpick][LMAX]
+		lmaxv[i] = ptab[PTe.LENWINS][lwinpick][LWe.LMAX]
 
-	precorder = precsort(ptab[ORDERPROB])
-	newtraj = np.copy(ptab[ACTWINS])
+	precorder = precsort(ptab[PTe.ORDERPROB])
+	newtraj = np.copy(ptab[PTe.ACTWINS])
 	newtraj = np.append(newtraj,lengths,axis=0)
 	newtraj = np.append(newtraj,precorder,axis=0)
 	newtraj = np.append(newtraj,lmaxv,axis=0)
-	sorttraj = np.lexsort(newtraj[[WMAX,LENS,WMIN,WAVG,PREC]])
+	sorttraj = np.lexsort(newtraj[[AWe.WMAX,AWe.LENS,AWe.WMIN,AWe.WAVG,AWe.PREC]])
 	newtraj = newtraj.T[sorttraj].T
 
 	#pickwins up to 3 times
-	actpicks = np.full(ptab[ACTCOUNT],False)
-	validwin = np.full(ptab[ACTCOUNT],True)
+	actpicks = np.full(ptab[PTe.ACTCOUNT],False)
+	validwin = np.full(ptab[PTe.ACTCOUNT],True)
 	for i in range(3):
-		actpicks = actpicks | ((np.random.rand(ptab[ACTCOUNT]) < newtraj[ACTPROB]) & validwin
-		ends = np.cumsum(newtraj[LENS]*actpicks)
-		starts = (ends*actpicks) - newtraj[LENS]
-		validwin = True if start <= newtraj[WMAX] and start >=newtraj[WMIN] else False
-		if(newtraj[LMAX]*actpicks).sum() > 1440):
+		actpicks = actpicks | ((np.random.rand(ptab[PTe.ACTCOUNT]) < newtraj[AWe.ACTPROB]) & validwin)
+		ends = np.cumsum(newtraj[AWe.LENS]*actpicks)
+		starts = (ends*actpicks) - newtraj[AWe.LENS]
+		validwin = True if (start <= newtraj[AWe.WMAX] and start >= newtraj[AWe.WMIN]) else False
+		if(newtraj[AWe.LMAX]*actpicks).sum() > 1440:
 			break;
 
 	newtraj = newtraj.T[actpicks].T

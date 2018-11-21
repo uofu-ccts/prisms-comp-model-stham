@@ -32,12 +32,14 @@ def loadATUS(datapath,daypick=[1,2,3,4,5,6,7]):
 	demotable['TUCC2'] = demotable['TUCC2'].apply(tuccconv);
 	demotable['TUCC4'] = demotable['TUCC4'].apply(tuccconv);
 
-	mapping = np.sort(list(set(acttable[tiercode])))
-	actcount = len(mapping)
+	actmapping = np.sort(list(set(acttable[tiercode])))
+	actcount = len(actmapping)
+	ati = { tr:i for i,tr in enumerate(actmapping) }
 
-	tri = { tr:i for i,tr in enumerate(mapping) }
+	locmapping = np.sort(list(set(acttable['TEWHERE'])))
+	wti = { tr:i for i,tr in enumerate(locmapping) }
 
-	acttable['actcode'] = acttable[tiercode].apply(lambda x: tri[x]);
+	acttable['actcode'] = acttable[tiercode].apply(lambda x: ati[x]);
 	acttable = acttable[acttable['TUDIARYDAY'].apply(lambda x: x in daypick) ];
 	demotable = demotable[demotable['TUDIARYDAY'].apply(lambda x: x in daypick) ];
 
@@ -46,23 +48,30 @@ def loadATUS(datapath,daypick=[1,2,3,4,5,6,7]):
 	acttable['end'] = acttable['TUCUMDUR24']
 	acttable['length'] = acttable['end']-acttable['start']
 	acttable['length'] = acttable['length'].apply(lambda x:1 if x <= 0 else x)
-	acttable['where'] = acttable['TEWHERE'];
+	acttable['where'] = acttable['TEWHERE'].apply(lambda x: wti[x]);
 
 
 	democols = ['TUCASEID','TEAGE', 'TEHRUSL1', 'TELFS', 'TESCHENR', 'TESCHFT', 'TESCHLVL', 'TESEX', 'TESPEMPNOT', 'TESPUHRS', 'TRCHILDNUM', 'TRDPFTPT', 'TRHHCHILD', 'TRSPPRES', 'TUDIS2', 'TUELNUM', 'TUSPUSFT']
 
-	return acttable[['case','start','end','length','actcode']], demotable[democols], mapping
+	return acttable[['case','start','end','length','actcode']], demotable[democols], actmapping, locmapping
 
 def test():
 
-	#FIXME: remove hard coded path
+	#FIXME: remove hard coded path and code
 	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/timeuse/"
 
-	acttable,demotable,mapping = loadATUS(datapath)
+	acttable,demotable,actmapping,locmapping = loadATUS(datapath)
 
-	supervec,supercolumns = activities.vectorizeActs(acttable,demotable,mapping,'TUCASEID')
+	labelpath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/final-label-classifier/"
+	labels = pd.read_csv(labelpath + "labels.csv")
+	caselist = labels[labels["daytypelabelreduce"].values==24]['TUCASEID'].values
+	subact = acttable[acttable['case'].apply(lambda x: True if x in caselist else False)]
+	window = activities.buildWindow(subact);
 
-	print(supervec,supercolumns)
+	print(window)
+
+	# supervec,supercolumns = activities.vectorizeActs(acttable,demotable,actmapping,,'TUCASEID')
+
 
 
 if __name__ == "__main__": 

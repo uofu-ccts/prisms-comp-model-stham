@@ -63,19 +63,19 @@ def breaks1d(df, ncomp=10):
 	return pred;
 
 def assignWindow(x,wins):
-	out = wins[wins['actind']==x['actind']][wins['wmax']>=x['start']][wins['wmin']<=x['start']].index;
+	out = wins[wins['actcode']==x['actcode']][wins['wmax']>=x['start']][wins['wmin']<=x['start']].index;
 	if(len(out) < 1): return -1;
 	return out[0];
 
 def assignLen(x,lens):
-	out = lens[lens['actind']==x['actind']][lens['lmax']>=x['length']][lens['lmin']<=x['length']] .index;
+	out = lens[lens['actcode']==x['actcode']][lens['lmax']>=x['length']][lens['lmin']<=x['length']].index;
 	if(len(out) < 1): return -1;
 	return out[0];
 
 def phist(x,bins):
 	a,b = np.histogram(x['length'].values,bins=bins);
 	a = a/np.sum(a)
-	return np.array(a),np.array(b);
+	return a,b
 
 def getwindows(df,bins=10,ncomp=10):
 	ncases = df['case'].unique().size
@@ -103,11 +103,17 @@ def getwindows(df,bins=10,ncomp=10):
 		lengths['ref'] = lengths.index;
 		lengths['lmin'] = g.groupby('lenwin').apply(lambda x: x['length'].min());
 		lengths['lmax'] = g.groupby('lenwin').apply(lambda x: x['length'].max());
-		lengths['lhist'] = 0; lengths['lbins'] = 0;
-		#FIXME when not tired
-		result = g.groupby('lenwin').apply(phist,bins);
-		print(result)
-		lengths['actind'] = i;
+		g1 = g.groupby('lenwin')
+		lhist = np.zeros((len(g1),bins))
+		lbins = np.zeros((len(g1),bins+1))
+		c = 0
+		for j,galt in g1:
+			lhist[c],lbins[c] = phist(galt,bins)
+			c += 1
+
+		lengths['lhist'] = np.split(lhist,len(g1))
+		lengths['lbins'] = np.split(lbins,len(g1))
+		lengths['actcode'] = i;
 
 		alllengths = alllengths.append(lengths);
 
@@ -152,9 +158,9 @@ def buildWindow(acttable,lhistbins=10):
 	#by sorting with descending start time, we guarantee that we always assign a window
 	#preventing the issue with the joint probability window lacking an 
 	#index for the window
-	wins = wins.sort_values(['wmin','prob'],ascending=[False,False]);
-	acttable['wins'] = acttable[['actind','start']].apply(assignWindow,args=(wins,),axis=1);
-	acttable['lwins'] = acttable[['actind','length']].apply(assignLen,args=(lens,),axis=1);
+	wins = wins.sort_values(['wmin','actprob'],ascending=[False,False]);
+	acttable['wins'] = acttable[['actcode','start']].apply(assignWindow,args=(wins,),axis=1);
+	acttable['lwins'] = acttable[['actcode','length']].apply(assignLen,args=(lens,),axis=1);
 	acttable = acttable.sort_values(['case','start'])
 
 	lenactjointprob = acttable.groupby(['wins']).apply(lambda x: x['lwins'].value_counts() / x['lwins'].count() ).values;
@@ -162,10 +168,10 @@ def buildWindow(acttable,lhistbins=10):
 
 	whereprob = acttable.groupby(['wins']).apply(lambda x: x['where'].value_counts() / x['where'].count() ).values;
 
-	precede = getPrecedeMat(df,wins);
+	precede = getPrecedeMat(acttable,wins);
 
 
-	winmat = wins[['actcode','actprob','wmin','wamx','wavg']].values;
+	winmat = wins[['actcode','actprob','wmin','wmax','wavg']].values;
 	lenmat = lens[['lmin','lmax']].values;
 	lhist = np.array(lens["lhist"].values)
 	lbins = np.array(lens["lbins"].values)

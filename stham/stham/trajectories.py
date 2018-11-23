@@ -56,7 +56,7 @@ def buildtraj(agent, locs, ptab, tripmethod=None):
 	
 	
 	if(tripmethod == None):
-		tripmethod = 
+		tripmethod = None
 
 	wherecount = len(PTe.WHEREPROB[0])
 	lengths = np.zeros(ptab[PTe.ACTCOUNT])

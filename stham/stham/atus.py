@@ -53,7 +53,7 @@ def loadATUS(datapath,daypick=[1,2,3,4,5,6,7]):
 
 	democols = ['TUCASEID','TEAGE', 'TEHRUSL1', 'TELFS', 'TESCHENR', 'TESCHFT', 'TESCHLVL', 'TESEX', 'TESPEMPNOT', 'TESPUHRS', 'TRCHILDNUM', 'TRDPFTPT', 'TRHHCHILD', 'TRSPPRES', 'TUDIS2', 'TUELNUM', 'TUSPUSFT']
 
-	return acttable[['case','start','end','length','actcode']], demotable[democols], actmapping, locmapping
+	return acttable[['case','start','end','length','actcode','where']], demotable[democols], actmapping, locmapping
 
 def test():
 

@@ -1,6 +1,7 @@
 import pandas as pd;
 import numpy as np;
 import rtree;
+import locations
 from enum import Enum
 
 
@@ -16,6 +17,7 @@ class PTe(Enum):
 	ORDERPROB = 8
 	WHEREPROB = 9
 
+
 class AWe(Enum):
 	ACTCODE = 0
 	ACTPROB = 1
@@ -25,6 +27,7 @@ class AWe(Enum):
 	LENS = 5 #only in newtraj
 	PREC = 6 #only in newtraj
 	LMAX = 7 #only in newtraj
+	LOC = 8 #only in newtraj
 
 class LWe(Enum):
 	LMIN = 0
@@ -49,10 +52,16 @@ def precsort(precede):
 	
 	return np.sum(omat, axis=0);
 
-def buildtraj(agent, locs, ptab):
+def buildtraj(agent, locs, ptab, tripmethod=None):
 	
+	
+	if(tripmethod == None):
+		tripmethod = 
+
+	wherecount = len(PTe.WHEREPROB[0])
 	lengths = np.zeros(ptab[PTe.ACTCOUNT])
 	lmaxv = np.zeros(ptab[PTe.ACTCOUNT])
+	where = np.zeros(ptab[PTe.ACTCOUNT])
 	for i in range(ptab[PTe.ACTCOUNT]):
 		lwinpick = np.random.choice(ptab[PTe.LENCOUNT],p=ptab[PTe.LENACTJOINTPROB][i])
 		lhistpick = np.random.choice(ptab[PTe.LHISTLEN],p=ptab[PTe.LHIST][lwinpick])
@@ -60,12 +69,14 @@ def buildtraj(agent, locs, ptab):
 		high = ptab[PTe.LBINS][lwinpick][lhistpick + 1]
 		lengths[i] = np.random.rand() * (high-low) + low
 		lmaxv[i] = ptab[PTe.LENWINS][lwinpick][LWe.LMAX]
+		where[i] = np.random.choice(wherecount,p=ptab[Pte.WHEREPROB][i])
 
 	precorder = precsort(ptab[PTe.ORDERPROB])
 	newtraj = np.copy(ptab[PTe.ACTWINS])
 	newtraj = np.append(newtraj,lengths,axis=0)
 	newtraj = np.append(newtraj,precorder,axis=0)
 	newtraj = np.append(newtraj,lmaxv,axis=0)
+	newtraj = np.append(newtraj,where,axis=0)
 	sorttraj = np.lexsort(newtraj[[AWe.WMAX,AWe.LENS,AWe.WMIN,AWe.WAVG,AWe.PREC]])
 	newtraj = newtraj.T[sorttraj].T
 
@@ -85,8 +96,10 @@ def buildtraj(agent, locs, ptab):
 
 	#setlocs
 
-	#get x/y
 
+	#get x/y
+	xcoord = np.zeros(len(newtraj))
+	ycoord = np.zeros(len(newtraj))
 	#get trips
 
 	#smear

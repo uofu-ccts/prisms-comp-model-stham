@@ -17,7 +17,7 @@ def loadATUS(datapath,daypick=[1,2,3,4,5,6,7]):
 	#tiercode = 'TRTIER2'
 	tiercode = 'TRCODE'
 
-	#FIXME get rid of automatic 
+	#FIXME get rid of automatic paths
 	acttable = pd.read_csv(datapath + "atusact_2015/atusact_2015.dat")
 	demotable = pd.read_csv(datapath + "atusresp_2015/atusresp_2015.dat")
 	rosttable = pd.read_csv(datapath + "atusrost_2015/atusrost_2015.dat")

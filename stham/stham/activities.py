@@ -105,8 +105,8 @@ def getwindows(df,bins=10,ncomp=10):
 		lengths['lmax'] = g.groupby('lenwin').apply(lambda x: x['length'].max());
 		lengths['lhist'] = 0; lengths['lbins'] = 0;
 		#FIXME when not tired
-		a,b = g.groupby('lenwin').apply(phist,bins);
-		print(a,b)
+		result = g.groupby('lenwin').apply(phist,bins);
+		print(result)
 		lengths['actind'] = i;
 
 		alllengths = alllengths.append(lengths);
@@ -159,8 +159,10 @@ def buildWindow(acttable,lhistbins=10):
 
 	lenactjointprob = acttable.groupby(['wins']).apply(lambda x: x['lwins'].value_counts() / x['lwins'].count() ).values;
 	# print(jointprob);
-
-	whereprob = acttable.groupby(['wins']).apply(lambda x: x['where'].value_counts() / x['where'].count() ).values;
+	whereprob = np.zeros(len(wins),acttable['where'].max() + 1)
+	wheretabs = acttable.groupby(['wins']).apply(lambda x: x['where'].value_counts() / x['where'].count() ).values;
+	for ind,i in enumerate(wheretabs):
+		whereprob[ind][i.index.values] = i.values
 
 	precede = getPrecedeMat(df,wins);
 

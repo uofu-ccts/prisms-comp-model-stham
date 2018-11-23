@@ -25,6 +25,12 @@ def getgrid(x,y,x0,y0,res):
 	return x,y
 
 
+def taxicabtrip(x0,y0,x1,y1):
+	#assumes GPS input?
+	#returns a time,x,y
+	return 
+
+
 def bresenham(x0,y0,x1,y1):
 	"""
 	Implements Bresenham's line algorithm. 
@@ -59,6 +65,13 @@ def dist(x0,y0,x1,y1):
 	dx = x1-x0; dy = y1-y0;
 	return np.sqrt(dx*dx+dy*dy)
 
+def buildloctree(locs):
+	p=rtree.index.Property(variant=rtree.index.RT_Star)
+	idx = rtree.index.Rtree(properties=p)
+	for i in locs:
+		idx.insert(i[0],(i[1],i[2],i[1],i[2]));
+	return idx
+
 
 def loadLocs(file, target, aux, xyproj, meta=None, latlongproj='epsg:4326'):
 	"""
@@ -82,7 +95,7 @@ def loadLocs(file, target, aux, xyproj, meta=None, latlongproj='epsg:4326'):
 	optional alternate type id, and a description
 
 	"""
-
+	pass;
 
 
 

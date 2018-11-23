@@ -105,7 +105,8 @@ def getwindows(df,bins=10,ncomp=10):
 		lengths['lmax'] = g.groupby('lenwin').apply(lambda x: x['length'].max());
 		lengths['lhist'] = 0; lengths['lbins'] = 0;
 		#FIXME when not tired
-		lengths[['lhist','lbins']] = g.groupby('lenwin').apply(phist,bins);
+		result = g.groupby('lenwin').apply(phist,bins);
+		print(result)
 		lengths['actind'] = i;
 
 		alllengths = alllengths.append(lengths);

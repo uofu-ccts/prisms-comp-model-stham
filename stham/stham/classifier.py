@@ -99,7 +99,6 @@ def stripUnlabelled(vector,labels):
 	striplabel = labels[labels > -1]
 	return stripframe, striplabel;
 
-#FIXME need to split to that tsne happens and allows eps/samples to be determined 
 def determineCoords(vector, perplex=30,procs=4,nest=2000):
 
 	# print("Initial random forest fitting...")

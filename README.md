@@ -1,4 +1,4 @@
-#STHAM
+# STHAM
 
 The Spatio Temporal Human Activity Model
 

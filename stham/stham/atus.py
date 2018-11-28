@@ -2,6 +2,8 @@ import pandas as pd;
 import numpy as np;
 from datetime import datetime;
 import activities
+import trajectories
+import joblib
 
 def tuccconv(x):
 	if(x == '-1'): return -1;
@@ -68,7 +70,11 @@ def test():
 	subact = acttable[acttable['case'].apply(lambda x: True if x in caselist else False)]
 	window = activities.buildWindow(subact);
 
+	#FIXME: remove dump or add test path
+	joblib.dump(window,"windowtest.gz",compress=3)
 	print(window)
+
+	# print(trajectories.buildtraj(0,0,window))
 
 	# supervec,supercolumns = activities.vectorizeActs(acttable,demotable,actmapping,,'TUCASEID')
 

@@ -1,6 +1,6 @@
 import pandas as pd;
 import numpy as np;
-from trajectories import PTe,AWe,LWe;
+from enums import PTe,AWe,LWe;
 from sklearn.mixture import BayesianGaussianMixture;
 
 def columnStrip(frame, columns):
@@ -85,7 +85,9 @@ def getwindows(df,bins=10,ncomp=10):
 	alllengths = pd.DataFrame();
 
 	for i,g in df.groupby(['actcode']):
-		if len(g) < 10: continue;
+		#FIXME: need to come up with a solution for these eliminated activities
+		if len(g) < 10: continue; 
+
 		g['window'] = breaks1d(g[["start"]]);
 		g['lenwin'] = breaks1d(g[["length"]]);
 
@@ -148,6 +150,16 @@ def getPrecedeMat(df,wins):
 
 	return precede;
 
+
+def flattenmultiframe(frame, flip=False):
+	labels = np.array([frame.index.get_level_values(0),frame.index.get_level_values(1)])
+	labels = labels.astype(int)
+	fr = np.zeros((np.max(labels[0])+1,np.max(labels[1])+1))
+	fr[labels[0],labels[1]] = frame.values
+	if flip: fr = fr.T;
+	fr = (fr.T / np.sum(fr,axis=1)).T
+	return fr
+
 #TODO: parallelize at global level
 def buildWindow(acttable,lhistbins=10):
 
@@ -163,18 +175,23 @@ def buildWindow(acttable,lhistbins=10):
 	acttable['lwins'] = acttable[['actcode','length']].apply(assignLen,args=(lens,),axis=1);
 	acttable = acttable.sort_values(['case','start'])
 
-	lenactjointprob = acttable.groupby(['wins']).apply(lambda x: x['lwins'].value_counts() / x['lwins'].count() ).values;
-	# print(jointprob);
+	lenactjointprob = acttable.groupby(['wins']).apply(lambda x: x['lwins'].value_counts() / x['lwins'].count() );
+	lenactjointprob = flattenmultiframe(lenactjointprob,flip=False)
+	print(np.shape(lenactjointprob))
+	# lenactjointprob  /= np.sum(lenactjointprob,axis=0)
 
-	whereprob = acttable.groupby(['wins']).apply(lambda x: x['where'].value_counts() / x['where'].count() ).values;
+
+	# print(jointprob);
+	whereprob = acttable.groupby(['wins']).apply(lambda x: x['where'].value_counts() / x['where'].count() );
+	whereprob = flattenmultiframe(whereprob)
+	print(np.shape(whereprob))
 
 	precede = getPrecedeMat(acttable,wins);
 
-
 	winmat = wins[['actcode','actprob','wmin','wmax','wavg']].values;
 	lenmat = lens[['lmin','lmax']].values;
-	lhist = np.array(lens["lhist"].values)
-	lbins = np.array(lens["lbins"].values)
+	lhist = np.array([np.array(b).flatten() for b in lens["lhist"].values])
+	lbins = np.array([np.array(b).flatten() for b in lens["lbins"].values])
 
 	return {PTe.ACTCOUNT:len(wins),PTe.LENCOUNT:len(lens),PTe.LENACTJOINTPROB:lenactjointprob,PTe.ACTWINS:winmat,PTe.LENWINS:lenmat,PTe.LHIST:lhist,PTe.LBINS:lbins,PTe.ORDERPROB:precede,PTe.WHEREPROB:whereprob}
 

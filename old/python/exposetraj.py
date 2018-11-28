@@ -223,12 +223,12 @@ def main(threads):
 
 	setselect = int(sys.argv[1]);
 	seed = int(sys.argv[2]);
-	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/bmi-group1/prism/run03/"
-	path = datapath + "Ftraj4-2018-05-25_16-19-35-ForkPoolWorker-10.merge.sqlite3"
+	datapath = "/uufs/chpc.utah.edu/common/home/u0403692/bmi-group1/prism/run05/"
+	path = datapath + "Ftraj4-2018-09-13_15-55-21-ForkPoolWorker-10.merge.sqlite3"
 	con = sqlite3.connect(path);
 	
 	maxagent = int(pd.read_sql_query("select max(agentnum) from acttraj", con).iloc[0,0]);
-	st = 0; en = 100000;
+	st = 0; en = 10000;
 	print(maxagent)
 
 	blocks = (490351031001017,490351034003013,490351032001002,490351033003005,490351031001018,490351032001000,490351034003016,490351031001013,490351031001015,490351034003012,490351031001012,490351031001010,490351031001014,490351031001011,490351032001003,490351032001004,490351032001005,490351032001006,490351034003009,490351033003003,490351033003004,490351033003002,490351031001016,490351032001001)
@@ -255,7 +255,7 @@ def main(threads):
 	global mats;
 	mats = []
 	#96 slots, 3 sets
-	matfile = h5py.File(datapath + "newdiffusedvals.h5")
+	matfile = h5py.File(datapath + "diffusedvals.h5")
 	for i in range(0,96):
 		print(i)
 		mats += [matfile["/traj-slot-" + str(i).zfill(3) + "-set-" + str(setselect).zfill(3)][:]]
@@ -284,5 +284,5 @@ def main(threads):
 
 if __name__ == "__main__":
 	threads = mkl.get_max_threads();
-	# threads = 8;
+	threads = 8;
 	main(threads)

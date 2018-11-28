@@ -8,6 +8,8 @@ import numpy as np;
 
 datapath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/"
 outpath = "/uufs/chpc.utah.edu/common/home/u0403692/prog/prism/data/test/"
+
+simseqs = pd.read_csv(datapath + "simseqs.csv")
 # imgpath = outpath + "singleact-" + time.strftime("%Y-%m-%d_%H-%M-%S")
 # os.mkdir(imgpath)
 
@@ -61,6 +63,7 @@ for i in actmapping:
 
 
 acttable["color"] = acttable['mapped'].apply(lambda x: colors[x])
+simseqs["color"] = simseqs["actind"].apply(lambda x: colors[x])
 
 # print(acttable["color"])
 
@@ -72,7 +75,67 @@ for i in range(number_of_lines):
 
 weekdayset = [2,3,4,5,6]
 
-def plotseq(frame):
+
+def altplotseq(frame,label):
+	fig, ax = plt.subplots()
+
+	cneg = -1
+	cpos = 1;
+
+
+
+
+	for i,gr in enumerate(frame.groupby("agentnum")):
+		g,df = gr;
+		# df = df.sort_values(["TUACTIVITY_N"])
+		patches = [];
+
+
+		# day =  int(df['TUDIARYDAY'][0]) - 1;
+		# day =  (1 if df['TUDIARYDAY'].iloc[0] in weekdayset else 0);
+		day = 1
+
+		x = df['start'].values;
+		y = np.zeros_like(x)
+
+		if(day): 
+			y[:] = cneg
+			cneg -=1
+		else:
+			y[:] = cpos
+			cpos += 1
+
+		c = df['color'].values;
+		w = df['length'].values;
+		h = np.ones_like(w)
+		
+		for xi,yi,wi,hi,ci in zip(x,y,w,h,c):
+			patches.append(mpatch.Rectangle((xi,yi),wi,hi,facecolor=ci,edgecolor='black',linewidth=0.5))
+		
+		p = PatchCollection(patches,match_original=True)
+
+		ax.add_collection(p)
+
+		# cn+=1;
+		# if(cn > 500): break;
+		
+
+	# fig.legend(legart,leglabels,loc='center left', bbox_to_anchor=(1, 0.5))
+	#print(cn);
+
+	ax.set_xlim((0.,1440.))
+	ax.set_xticks((0,360.,720.,1080,1440.))
+	ax.set_xticklabels(("4:00", "10:00", "16:00", "22:00","4:00"))
+	ax.set_yticks(());
+	# ax.set_ylim((cneg,cpos))
+	ax.set_ylim(-24.0,0.0)
+	ax.set_aspect(60.0)
+
+	ax.set_title(label)
+	# plt.show()
+
+
+def plotseq(frame,label):
 	fig, ax = plt.subplots()
 
 	cneg = -1
@@ -126,10 +189,19 @@ def plotseq(frame):
 	ax.set_ylim(-24.0,0.0)
 	ax.set_aspect(1.0)
 
-	plt.show()
+	ax.set_title(label)
+
+	# plt.show()
 	# plt.show()
 
 for g,frame in acttable.groupby('daytypelabelreduce'):
-	if(g == 11):
+	if(g == 14):
 		print(g,len(frame))
-		plotseq(frame);
+		plotseq(frame,str(g)+",real");
+
+for g,frame in simseqs.groupby('daytype'):
+	if(g == 14):
+		print(g,len(frame))
+		altplotseq(frame,str(g)+",real");
+
+plt.show()

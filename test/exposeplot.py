@@ -26,7 +26,7 @@ def plthist(ax,arr1,arr2,alpha=1.0,color='RdBu'):
 
 def proctraj(intraj):
 
-	traj = np.reshape(intraj,(100000,96))
+	traj = np.reshape(intraj,(10000,96))
 	traj = np.clip(traj,0,np.max(traj))
 
 
@@ -103,7 +103,7 @@ def proctraj(intraj):
 # plthist(acute,total);
 # plthist(acute,peak); 
 
-datapath = "/uufs/chpc.utah.edu/common/home/u0403692/bmi-group1/prism/run03/"
+datapath = "/uufs/chpc.utah.edu/common/home/u0403692/bmi-group1/prism/run05/"
 exptraj0 = h5py.File(datapath + "finalexptraj-0.h5",'r')
 exptraj1 = h5py.File(datapath + "finalexptraj-1.h5",'r')
 exptraj2 = h5py.File(datapath + "finalexptraj-2.h5",'r')
@@ -206,9 +206,10 @@ for j in range(0,2):
 # plt.legend()
 
 pick = np.random.choice(len(trajz),size=5)
+pick = [ 641, 5923 ,9034 ,1200 ,9159 ,1934 ,7380, 5205, 4411 ,4072]
 print(pick)
 ax = fig.add_subplot(1,3,1)
-greyrange = np.linspace(0.80,0.20,5)
+greyrange = np.linspace(0.80,0.20,10)
 for i,g in zip(pick,greyrange):
 	ax.plot(trajz[i],linewidth=0.95,color=str(g))
 
@@ -222,17 +223,33 @@ ax.set_yticks([])
 
 plt.tight_layout();
 
-plt.savefig('exposefactors.eps',dpi = 300)
+plt.savefig('exposefactors-fix.eps',dpi = 300)
 
-# plt.show()
+
+#[ 641 5923 9034 1200 9159 1934 7380 5205 4411 4072]
+for xxx in range(1):
+	fig = plt.figure(figsize=(8.0,5.0))
+	# plt.show()
+	picksize = 10
+	# pick = np.random.choice(len(trajz),size=picksize)
+	pick = [ 641, 5923 ,9034 ,1200 ,9159 ,1934 ,7380, 5205, 4411 ,4072]
+	print(pick)
+	ax = fig.add_subplot(1,1,1)
+	greyrange = np.linspace(0.80,0.20,picksize)
+	for i,g in zip(pick,greyrange):
+		ax.plot(trajz[i],linewidth=0.95,color=str(g))
+
+	plt.show()
 
 exit()
+
+
 
 
 def f(val):
 	return '{:0.2f}'.format(val) + " "
 
-for i in range(0,100000):
+for i in range(0,10000):
 	for pj,tj in zip(arr,tarr):
 		l = f(pj[0][i]) + f(pj[1][i]) + f(pj[2][i]) + f(pj[3][i])
 		plt.plot(tj[i],linewidth=0.5,label=l)

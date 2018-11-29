@@ -60,8 +60,8 @@ def buildtraj(agent, locs, ptab, tripmethod=None):
 	actpicks = np.full(ptab[PTe.ACTCOUNT],False)
 	validwin = np.full(ptab[PTe.ACTCOUNT],True)
 	actprob = newtraj[AWe.ACTPROB.value]
+
 	for i in range(3):
-		print(actprob)
 		actpicks = actpicks | ((np.random.rand(ptab[PTe.ACTCOUNT]) < actprob ) & validwin)
 		ends = np.cumsum(newtraj[AWe.LENS.value]*actpicks)
 		starts = (ends*actpicks) - newtraj[AWe.LENS.value]
@@ -73,6 +73,8 @@ def buildtraj(agent, locs, ptab, tripmethod=None):
 		else:
 			#mass adjustment
 			actprob += 0.2
+	if(np.sum(newtraj[AWe.LMAX.value]*actpicks)) < 1440:
+		choices = np.random.choice(np.nonzero(np.invert(actpicks))[0],replace=False,size)
 	print(np.sum(newtraj[AWe.LMAX.value]*actpicks),actpicks)
 	newtraj = newtraj.T[actpicks]
 		
